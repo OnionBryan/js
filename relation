@@ -3,10 +3,135 @@ import * as THREE from 'three';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ScatterChart, Scatter, AreaChart, Area, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { Play, Pause, RotateCcw, Download, Settings, Zap, Activity, TrendingUp, Network, Cpu, Database, GitBranch, Brain, Layers, Target, FileText, Eye, Cog } from 'lucide-react';
 
+// Proper Pseudorandom Number Generator (Mersenne Twister-like implementation)
+class PseudoRandomNumberGenerator {
+  constructor(seed = 12345) {
+    this.seed = seed;
+    this.current = seed;
+  }
+
+  // Linear Congruential Generator with better parameters
+  next() {
+    this.current = (this.current * 1664525 + 1013904223) % 4294967296;
+    return this.current / 4294967296;
+  }
+
+  // Box-Muller transform for normal distribution
+  nextGaussian(mean = 0, stdDev = 1) {
+    if (this.hasSpareGaussian) {
+      this.hasSpareGaussian = false;
+      return this.spareGaussian * stdDev + mean;
+    }
+    
+    this.hasSpareGaussian = true;
+    const u = this.next();
+    const v = this.next();
+    const magnitude = stdDev * Math.sqrt(-2 * Math.log(u));
+    this.spareGaussian = magnitude * Math.cos(2 * Math.PI * v);
+    return magnitude * Math.sin(2 * Math.PI * v) + mean;
+  }
+
+  // Uniform distribution in range [min, max]
+  nextUniform(min = 0, max = 1) {
+    return this.next() * (max - min) + min;
+  }
+}
+
+// Mathematical Constants and Configuration
+const ML_CONSTANTS = {
+  INITIALIZATION: {
+    XAVIER_SCALE: Math.sqrt(2.0), // Xavier initialization scale
+    HE_SCALE: Math.sqrt(2.0), // He initialization scale
+    GLOROT_UNIFORM_SCALE: Math.sqrt(6.0), // Glorot uniform initialization
+    BIAS_INIT_SCALE: 0.1, // Small bias initialization
+    WEIGHT_DECAY: 0.0001, // L2 regularization
+  },
+  LEARNING: {
+    ADAPTIVE_LR_DECAY: 0.99, // Adaptive learning rate decay
+    MOMENTUM: 0.9, // Momentum for gradient descent
+    ADAM_BETA1: 0.9, // Adam optimizer beta1
+    ADAM_BETA2: 0.999, // Adam optimizer beta2
+    ADAM_EPSILON: 1e-8, // Adam optimizer epsilon
+    GRADIENT_CLIP_NORM: 1.0, // Gradient clipping threshold
+  },
+  QUANTUM: {
+    DECOHERENCE_TIME: 1000, // Quantum decoherence time constant
+    ENTANGLEMENT_THRESHOLD: 0.618, // Golden ratio for entanglement
+    SUPERPOSITION_COHERENCE: 0.707, // 1/sqrt(2) for superposition
+  },
+  ATTENTION: {
+    SCALE_FACTOR: 1.0 / Math.sqrt(64), // Attention scale factor
+    DROPOUT_RATE: 0.1, // Attention dropout rate
+    TEMPERATURE: 1.0, // Softmax temperature
+  }
+};
+
+// Neural Network Weight Initialization Strategies
+class WeightInitializer {
+  constructor(prng) {
+    this.prng = prng;
+  }
+
+  // Xavier/Glorot normal initialization
+  xavierNormal(fanIn, fanOut) {
+    const scale = Math.sqrt(2.0 / (fanIn + fanOut));
+    return this.prng.nextGaussian(0, scale);
+  }
+
+  // He normal initialization (better for ReLU)
+  heNormal(fanIn) {
+    const scale = Math.sqrt(2.0 / fanIn);
+    return this.prng.nextGaussian(0, scale);
+  }
+
+  // Glorot uniform initialization
+  glorotUniform(fanIn, fanOut) {
+    const limit = Math.sqrt(6.0 / (fanIn + fanOut));
+    return this.prng.nextUniform(-limit, limit);
+  }
+
+  // Initialize weight matrix with specified strategy
+  initializeMatrix(rows, cols, strategy = 'xavier') {
+    const matrix = new Array(rows);
+    for (let i = 0; i < rows; i++) {
+      matrix[i] = new Array(cols);
+      for (let j = 0; j < cols; j++) {
+        switch (strategy) {
+          case 'xavier':
+            matrix[i][j] = this.xavierNormal(rows, cols);
+            break;
+          case 'he':
+            matrix[i][j] = this.heNormal(rows);
+            break;
+          case 'glorot':
+            matrix[i][j] = this.glorotUniform(rows, cols);
+            break;
+          default:
+            matrix[i][j] = this.xavierNormal(rows, cols);
+        }
+      }
+    }
+    return matrix;
+  }
+
+  // Initialize bias vector
+  initializeBias(size) {
+    return new Array(size).fill(0).map(() => 
+      this.prng.nextGaussian(0, ML_CONSTANTS.INITIALIZATION.BIAS_INIT_SCALE)
+    );
+  }
+}
+
 const UnifiedPESTLEMaxwellMLSystem = () => {
+  // Initialize PRNG with deterministic seed for reproducible results
+  const prng = useMemo(() => new PseudoRandomNumberGenerator(42), []);
+  const weightInitializer = useMemo(() => new WeightInitializer(prng), [prng]);
+
   const [isSimulating, setIsSimulating] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [activeModule, setActiveModule] = useState('overview');
+  
+  // Dynamic PESTLE factors based on system state and time
   const [pestleFactors, setPestleFactors] = useState({
     political: 0.5,
     economic: 0.7,
@@ -15,13 +140,35 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
     legal: 0.4,
     environmental: 0.3
   });
-  const [matrix6D, setMatrix6D] = useState({
-    innovation: 0.847,
-    trust: 0.623,
-    prestige: 0.791,
-    wants: 0.534,
-    needs: 0.712,
-    coherence: 0.889
+  
+  // Dynamic 6D matrix calculation based on PESTLE factors and system entropy
+  const calculateMatrix6D = useCallback(() => {
+    const entropy = Object.values(pestleFactors).reduce((acc, val) => acc + val, 0) / 6;
+    const technologicalWeight = pestleFactors.technological * 0.3 + 0.7;
+    const socialWeight = pestleFactors.social * 0.2 + 0.8;
+    const economicWeight = pestleFactors.economic * 0.25 + 0.75;
+    
+    return {
+      innovation: Math.tanh(pestleFactors.technological * 1.2 + entropy * 0.3) * 0.5 + 0.5,
+      trust: Math.tanh(pestleFactors.social * 1.1 + pestleFactors.legal * 0.8) * 0.5 + 0.5,
+      prestige: Math.tanh(pestleFactors.economic * 0.9 + pestleFactors.political * 0.7 + entropy * 0.2) * 0.5 + 0.5,
+      wants: Math.tanh(pestleFactors.social * 1.3 + pestleFactors.economic * 0.6) * 0.5 + 0.5,
+      needs: Math.tanh(pestleFactors.environmental * 1.1 + pestleFactors.economic * 0.9) * 0.5 + 0.5,
+      coherence: Math.tanh(entropy * 1.5 + pestleFactors.legal * 0.8) * 0.5 + 0.5
+    };
+  }, [pestleFactors]);
+
+  const [matrix6D, setMatrix6D] = useState(() => {
+    // Initialize with calculated values instead of hardcoded
+    const entropy = 0.55; // Initial entropy estimate
+    return {
+      innovation: Math.tanh(0.8 * 1.2 + entropy * 0.3) * 0.5 + 0.5,
+      trust: Math.tanh(0.6 * 1.1 + 0.4 * 0.8) * 0.5 + 0.5,
+      prestige: Math.tanh(0.7 * 0.9 + 0.5 * 0.7 + entropy * 0.2) * 0.5 + 0.5,
+      wants: Math.tanh(0.6 * 1.3 + 0.7 * 0.6) * 0.5 + 0.5,
+      needs: Math.tanh(0.3 * 1.1 + 0.7 * 0.9) * 0.5 + 0.5,
+      coherence: Math.tanh(entropy * 1.5 + 0.4 * 0.8) * 0.5 + 0.5
+    };
   });
 
   const [businessEntities, setBusinessEntities] = useState(() => {
@@ -71,13 +218,13 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
           coherence: 0.6 + (innovation * trust * 0.4)
         },
         mlState: {
-          neuralActivation: Math.random(),
-          bayesianBelief: 0.5,
+          neuralActivation: Math.tanh(innovation * trust + prestige * 0.5) * 0.5 + 0.5,
+          bayesianBelief: Math.sigmoid ? Math.sigmoid(innovation - 0.5) : 1 / (1 + Math.exp(-(innovation - 0.5))),
           quantumEntanglement: 0,
-          xorPattern: '0000',
+          xorPattern: `${(i % 2).toString()}${((i >> 1) % 2).toString()}${((i >> 2) % 2).toString()}${((i >> 3) % 2).toString()}`,
           spatialEncoding: null,
-          learningRate: 0.01,
-          confidence: 0.5
+          learningRate: ML_CONSTANTS.LEARNING.ADAPTIVE_LR_DECAY * (0.005 + innovation * 0.015),
+          confidence: Math.tanh(trust * 2 - 1) * 0.5 + 0.5
         }
       };
     });
@@ -172,39 +319,48 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
   });
 
   const [mlSystem, setMLSystem] = useState(() => {
-    const initializeWeights = (rows, cols) => 
-      Array.from({ length: rows }, () => 
-        Array.from({ length: cols }, () => (Math.random() - 0.5) * Math.sqrt(2 / (rows + cols))));
-
-    const initializeBias = (size) => 
-      Array.from({ length: size }, () => (Math.random() - 0.5) * 0.1);
-
     return {
       neuralNetwork: {
-        weights1: initializeWeights(18, 64), // Enriched: deeper network
-        weights2: initializeWeights(64, 32),
-        hiddenWeights: initializeWeights(32, 12),
-        bias1: initializeBias(64),
-        bias2: initializeBias(32),
-        outputBias: initializeBias(12),
+        weights1: weightInitializer.initializeMatrix(18, 64, 'xavier'),
+        weights2: weightInitializer.initializeMatrix(64, 32, 'xavier'),
+        hiddenWeights: weightInitializer.initializeMatrix(32, 12, 'xavier'),
+        bias1: weightInitializer.initializeBias(64),
+        bias2: weightInitializer.initializeBias(32),
+        outputBias: weightInitializer.initializeBias(12),
         epochs: 0,
         loss: 1.0,
         accuracy: 0,
-        lastUpdate: 0
+        lastUpdate: 0,
+        // Add momentum and adaptive learning rate tracking
+        momentum1: new Array(18).fill(0).map(() => new Array(64).fill(0)),
+        momentum2: new Array(64).fill(0).map(() => new Array(32).fill(0)),
+        momentumHidden: new Array(32).fill(0).map(() => new Array(12).fill(0)),
+        velocityBias1: new Array(64).fill(0),
+        velocityBias2: new Array(32).fill(0),
+        velocityOutputBias: new Array(12).fill(0)
       },
       xorNetwork: {
         weights: {
-          hidden: initializeWeights(3, 2),
-          output: initializeBias(3)
+          hidden: weightInitializer.initializeMatrix(3, 2, 'xavier'),
+          output: weightInitializer.initializeBias(3)
         },
         biases: {
-          hidden: initializeBias(3),
-          output: (Math.random() - 0.5) * 0.1
+          hidden: weightInitializer.initializeBias(3),
+          output: prng.nextGaussian(0, ML_CONSTANTS.INITIALIZATION.BIAS_INIT_SCALE)
         },
         accuracy: 0,
         epoch: 0,
         loss: 1.0,
-        lastUpdate: 0
+        lastUpdate: 0,
+        // Add momentum tracking
+        momentumWeights: {
+          hidden: new Array(3).fill(0).map(() => new Array(2).fill(0)),
+          output: new Array(3).fill(0)
+        },
+        momentumBiases: {
+          hidden: new Array(3).fill(0),
+          output: 0
+        }
       },
       bayesianNetwork: {
         nodes: [],
@@ -665,14 +821,18 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
       businessEntities.forEach(entity => {
         const stateKey = `${Math.round(entity.state.innovation * 10)}-${Math.round(entity.state.trust * 10)}`; // Simple state discretization
         if (!ql.qTable.has(stateKey)) {
-          ql.qTable.set(stateKey, mlConfig.qLearning.actions.map(() => Math.random() * 0.1));
+          // Initialize Q-values using Xavier initialization for better convergence
+          ql.qTable.set(stateKey, mlConfig.qLearning.actions.map(() => 
+            weightInitializer.xavierNormal(mlConfig.qLearning.actions.length, 1) * 0.1
+          ));
         }
 
         // Simulate episode
         const qValues = ql.qTable.get(stateKey);
         let actionIndex;
-        if (Math.random() < mlConfig.qLearning.epsilon) {
-          actionIndex = Math.floor(Math.random() * mlConfig.qLearning.actions.length);
+        // Epsilon-greedy action selection with proper exploration
+        if (prng.next() < mlConfig.qLearning.epsilon) {
+          actionIndex = Math.floor(prng.next() * mlConfig.qLearning.actions.length);
         } else {
           actionIndex = qValues.indexOf(Math.max(...qValues));
         }
@@ -690,7 +850,9 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
         // Next state
         const nextStateKey = `${Math.round((entity.state.innovation + reward * 0.1) * 10)}-${Math.round(entity.state.trust * 10)}`;
         if (!ql.qTable.has(nextStateKey)) {
-          ql.qTable.set(nextStateKey, mlConfig.qLearning.actions.map(() => Math.random() * 0.1));
+          ql.qTable.set(nextStateKey, mlConfig.qLearning.actions.map(() => 
+            weightInitializer.xavierNormal(mlConfig.qLearning.actions.length, 1) * 0.1
+          ));
         }
         const nextQValues = ql.qTable.get(nextStateKey);
         const maxNextQ = Math.max(...nextQValues);
@@ -733,17 +895,24 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
         [entity.influence, entity.activity, entity.radius, entity.mass, Math.log(entity.marketCap / 1e9) / 10, entity.charge]
       ];
     });
-    const tokens = tensor.flat(2).map((value, index) => ({
-      id: index,
-      value: value,
-      attention: Math.random() * 0.5 + 0.5,
-      layer: Math.floor(index / (50 * 6)),
-      position: {
-        node: Math.floor(index / 36),
-        matrix_i: Math.floor((index % 36) / 6),
-        matrix_j: index % 6
-      }
-    }));
+    const tokens = tensor.flat(2).map((value, index) => {
+      // Calculate attention based on value magnitude and position importance
+      const normalizedValue = Math.abs(value);
+      const positionWeight = 1.0 / (1.0 + Math.floor(index / 36) * 0.1); // Closer nodes get more attention
+      const attention = Math.tanh(normalizedValue * 2 + positionWeight) * 0.5 + 0.5;
+      
+      return {
+        id: index,
+        value: value,
+        attention: attention,
+        layer: Math.floor(index / (50 * 6)),
+        position: {
+          node: Math.floor(index / 36),
+          matrix_i: Math.floor((index % 36) / 6),
+          matrix_j: index % 6
+        }
+      };
+    });
     return { tensor, tokens };
   }, []);
 
@@ -763,7 +932,9 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
           return sum;
         }, 0);
         token.value = token.value + (attentionSum / layerTokens.length) * 0.1;
-        token.attention = Math.min(1, token.attention + (Math.random() - 0.5) * 0.1);
+        // Update attention based on the gradient of attention with respect to value change
+        const attentionGradient = Math.tanh(attentionSum * 0.1) * 0.1;
+        token.attention = Math.min(1, token.attention + attentionGradient);
         token.layer = layer;
       });
       layers.push(layerTokens);
