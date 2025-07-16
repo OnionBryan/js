@@ -1113,11 +1113,74 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
     });
   }, [sigmoid, safeAdd, safeMult, mlConfig, currentTime]);
 
+  // Enhanced Bayesian Network with proper belief propagation
+  const bayesianBeliefPropagation = useCallback((nodes, maxIterations = 10) => {
+    // Message passing algorithm for belief propagation
+    const messages = new Map();
+    const marginals = new Map();
+    
+    // Initialize messages
+    nodes.forEach(node => {
+      node.children.forEach(child => {
+        messages.set(`${node.id}->${child}`, 1.0);
+      });
+      node.parents.forEach(parent => {
+        messages.set(`${parent}->${node.id}`, 1.0);
+      });
+    });
+    
+    // Iterative message passing
+    for (let iteration = 0; iteration < maxIterations; iteration++) {
+      let converged = true;
+      
+      nodes.forEach(node => {
+        // Calculate messages to children
+        node.children.forEach(childId => {
+          const oldMessage = messages.get(`${node.id}->${childId}`) || 1.0;
+          
+          // Calculate new message based on evidence and parent messages
+          let newMessage = node.evidence || 0.5;
+          
+          // Incorporate messages from parents
+          node.parents.forEach(parentId => {
+            const parentMessage = messages.get(`${parentId}->${node.id}`) || 1.0;
+            newMessage *= parentMessage;
+          });
+          
+          // Normalize
+          newMessage = Math.max(0.01, Math.min(0.99, newMessage));
+          
+          if (Math.abs(oldMessage - newMessage) > 0.001) {
+            converged = false;
+          }
+          
+          messages.set(`${node.id}->${childId}`, newMessage);
+        });
+        
+        // Calculate marginal belief
+        let marginal = node.evidence || 0.5;
+        node.parents.forEach(parentId => {
+          const parentMessage = messages.get(`${parentId}->${node.id}`) || 1.0;
+          marginal *= parentMessage;
+        });
+        
+        // Normalize marginal
+        marginal = Math.max(0.01, Math.min(0.99, marginal));
+        marginals.set(node.id, marginal);
+      });
+      
+      if (converged) break;
+    }
+    
+    return marginals;
+  }, []);
+
   const updateBayesianNetwork = useCallback(() => {
     setMLSystem(prev => {
       const bayesian = { ...prev.bayesianNetwork };
       const nodeCount = businessEntities.length;
 
+      // Initialize nodes with proper structure
       if (bayesian.nodes.length !== nodeCount) {
         bayesian.nodes = Array.from({ length: nodeCount }, (_, i) => ({
           id: i,
@@ -1127,25 +1190,81 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
           children: [],
           conditionalProbabilities: new Map()
         }));
+        
+        // Create network structure based on business entity connections
+        businessEntities.forEach((entity, i) => {
+          if (entity.connections && entity.connections.length > 0) {
+            entity.connections.forEach(connId => {
+              const connIndex = businessEntities.findIndex(e => e.id === connId);
+              if (connIndex !== -1 && connIndex !== i) {
+                bayesian.nodes[i].children.push(connIndex);
+                bayesian.nodes[connIndex].parents.push(i);
+                
+                // Set conditional probabilities based on entity relationships
+                const trustFactor = entity.trust || 0.5;
+                const innovationFactor = entity.innovation || 0.5;
+                const cpd = {
+                  parentTrue: trustFactor * innovationFactor,
+                  parentFalse: (1 - trustFactor) * (1 - innovationFactor)
+                };
+                bayesian.nodes[connIndex].conditionalProbabilities.set(i, cpd);
+              }
+            });
+          }
+        });
+        
         bayesian.beliefs = new Array(nodeCount).fill(0.5);
       }
 
+      // Update evidence for each node
       businessEntities.forEach((entity, i) => {
         if (i < bayesian.nodes.length) {
           const node = bayesian.nodes[i];
-          const evidence = (entity.state?.innovation || 0) * (entity.state?.trust || 0) * (entity.state?.coherence || 0);
-
+          
+          // Calculate evidence from multiple sources
+          const innovationEvidence = entity.state?.innovation || 0;
+          const trustEvidence = entity.state?.trust || 0;
+          const coherenceEvidence = entity.state?.coherence || 0;
+          const marketEvidence = Math.tanh(Math.log(entity.marketCap / SYSTEM_CONFIG.BUSINESS_ENTITIES.MARKET_CAP.NORMALIZATION_FACTOR) / 10);
+          
+          // Combine evidence using weighted average
+          const evidence = (innovationEvidence * 0.3 + 
+                          trustEvidence * 0.25 + 
+                          coherenceEvidence * 0.25 + 
+                          marketEvidence * 0.2);
+          
           if (isFinite(evidence)) {
             node.evidence = Math.max(0, Math.min(1, evidence));
-            const priorBelief = node.belief || 0.5;
-            const likelihood = evidence > mlConfig.bayesian.evidenceThreshold ? 0.8 : 0.2;
-            const marginal = (likelihood * priorBelief) + ((1 - likelihood) * (1 - priorBelief));
-            const posteriorBelief = marginal > 0 ? (likelihood * priorBelief) / marginal : priorBelief;
+          }
+        }
+      });
 
-            if (isFinite(posteriorBelief)) {
-              node.belief = Math.max(0, Math.min(1, posteriorBelief));
-              bayesian.beliefs[i] = node.belief;
-            }
+      // Perform belief propagation
+      const marginals = bayesianBeliefPropagation(bayesian.nodes);
+      
+      // Update beliefs based on marginals
+      marginals.forEach((marginal, nodeId) => {
+        if (nodeId < bayesian.nodes.length) {
+          bayesian.nodes[nodeId].belief = marginal;
+          bayesian.beliefs[nodeId] = marginal;
+        }
+      });
+
+      // Update business entity Bayesian beliefs
+      businessEntities.forEach((entity, i) => {
+        if (i < bayesian.beliefs.length) {
+          const updatedBelief = bayesian.beliefs[i];
+          if (isFinite(updatedBelief)) {
+            // Update entity's ML state
+            setBusinessEntities(prev => prev.map((e, idx) => 
+              idx === i ? {
+                ...e,
+                mlState: {
+                  ...e.mlState,
+                  bayesianBelief: updatedBelief
+                }
+              } : e
+            ));
           }
         }
       });
@@ -1153,29 +1272,136 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
       bayesian.lastUpdate = currentTime;
       return { ...prev, bayesianNetwork: bayesian };
     });
-  }, [businessEntities, mlConfig, currentTime]);
+  }, [businessEntities, mlConfig, currentTime, bayesianBeliefPropagation]);
+
+  // Enhanced Quantum System with proper quantum mechanics
+  const quantumMechanics = useMemo(() => ({
+    // Pauli matrices for quantum operations
+    pauliX: [[0, 1], [1, 0]],
+    pauliY: [[0, -1], [1, 0]], // Imaginary components handled as real approximations
+    pauliZ: [[1, 0], [0, -1]],
+    
+    // Hadamard gate for superposition
+    hadamard: [[1/Math.sqrt(2), 1/Math.sqrt(2)], [1/Math.sqrt(2), -1/Math.sqrt(2)]],
+    
+    // Apply quantum gate to qubit state
+    applyGate: (gate, qubit) => {
+      const [a, b] = qubit; // [alpha, beta] coefficients
+      return [
+        gate[0][0] * a + gate[0][1] * b,
+        gate[1][0] * a + gate[1][1] * b
+      ];
+    },
+    
+    // Measure quantum state (collapse to classical)
+    measure: (qubit) => {
+      const [alpha, beta] = qubit;
+      const prob0 = alpha * alpha;
+      const prob1 = beta * beta;
+      // Normalize probabilities
+      const total = prob0 + prob1;
+      if (total === 0) return 0;
+      return prob0 / total > 0.5 ? 0 : 1;
+    },
+    
+    // Calculate entanglement entropy
+    entanglementEntropy: (qubit1, qubit2) => {
+      const [a1, b1] = qubit1;
+      const [a2, b2] = qubit2;
+      
+      // Calculate reduced density matrix eigenvalues
+      const rho00 = a1 * a1 * a2 * a2;
+      const rho11 = b1 * b1 * b2 * b2;
+      
+      // Von Neumann entropy
+      const entropy = -rho00 * Math.log(rho00 + 1e-10) - rho11 * Math.log(rho11 + 1e-10);
+      return isFinite(entropy) ? entropy : 0;
+    },
+    
+    // Bell state creation for maximum entanglement
+    createBellState: () => {
+      const inv_sqrt2 = 1 / Math.sqrt(2);
+      return {
+        qubit1: [inv_sqrt2, inv_sqrt2],
+        qubit2: [inv_sqrt2, -inv_sqrt2]
+      };
+    }
+  }), []);
 
   const updateQuantumSystem = useCallback(() => {
     setMLSystem(prev => {
       const quantum = { ...prev.quantumSystem };
       const nodeCount = businessEntities.length;
 
+      // Initialize qubits with proper quantum states
       if (quantum.qubits.length !== nodeCount) {
-        quantum.qubits = Array.from({ length: nodeCount }, () => ({ 
-          state: 0, 
-          superposition: false 
-        }));
+        quantum.qubits = Array.from({ length: nodeCount }, (_, i) => {
+          const entity = businessEntities[i];
+          const innovation = entity?.state?.innovation || 0;
+          const trust = entity?.state?.trust || 0;
+          
+          // Initialize qubit in superposition based on entity properties
+          const alpha = Math.sqrt(innovation);
+          const beta = Math.sqrt(1 - innovation);
+          
+          return {
+            state: [alpha, beta], // Quantum superposition coefficients
+            classicalState: innovation > 0.5 ? 1 : 0,
+            superposition: Math.abs(innovation - 0.5) < mlConfig.quantum.superpositionRange,
+            phase: trust * Math.PI, // Quantum phase
+            coherenceTime: ML_CONSTANTS.QUANTUM.DECOHERENCE_TIME
+          };
+        });
       }
 
+      // Update quantum states based on entity evolution
       businessEntities.forEach((entity, i) => {
         if (i < quantum.qubits.length) {
           const qubit = quantum.qubits[i];
           const innovation = entity.state?.innovation || 0;
-          qubit.state = innovation > 0.5 ? 1 : 0;
-          qubit.superposition = Math.abs(innovation - 0.5) < mlConfig.quantum.superpositionRange;
+          const trust = entity.state?.trust || 0;
+          const coherence = entity.state?.coherence || 0;
+          
+          // Apply quantum evolution based on Hamiltonian
+          const timeStep = 0.01;
+          const evolutionPhase = coherence * timeStep;
+          
+          // Update superposition coefficients
+          const oldAlpha = qubit.state[0];
+          const oldBeta = qubit.state[1];
+          
+          // Apply rotation based on entity properties
+          const rotationAngle = innovation * Math.PI / 2;
+          const newAlpha = oldAlpha * Math.cos(rotationAngle) - oldBeta * Math.sin(rotationAngle);
+          const newBeta = oldAlpha * Math.sin(rotationAngle) + oldBeta * Math.cos(rotationAngle);
+          
+          // Normalize quantum state
+          const norm = Math.sqrt(newAlpha * newAlpha + newBeta * newBeta);
+          if (norm > 0) {
+            qubit.state = [newAlpha / norm, newBeta / norm];
+          }
+          
+          // Update classical measurement
+          qubit.classicalState = quantumMechanics.measure(qubit.state);
+          
+          // Update superposition status
+          qubit.superposition = Math.abs(Math.abs(qubit.state[0]) - Math.abs(qubit.state[1])) < ML_CONSTANTS.QUANTUM.SUPERPOSITION_COHERENCE;
+          
+          // Update phase
+          qubit.phase = trust * Math.PI;
+          
+          // Decoherence over time
+          qubit.coherenceTime *= mlConfig.quantum.coherenceDecay;
+          if (qubit.coherenceTime < 1) {
+            // Decohere to classical state
+            qubit.state = qubit.classicalState === 1 ? [0, 1] : [1, 0];
+            qubit.superposition = false;
+            qubit.coherenceTime = ML_CONSTANTS.QUANTUM.DECOHERENCE_TIME;
+          }
         }
       });
 
+      // Calculate quantum entanglements
       quantum.entanglements.clear();
       businessEntities.forEach((entity, i) => {
         if (entity.connections && Array.isArray(entity.connections)) {
@@ -1183,11 +1409,42 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
             const j = connId - 1;
             if (j >= 0 && j < quantum.qubits.length && j !== i) {
               const connectedEntity = businessEntities[j];
-              if (connectedEntity) {
-                const compatibility = (entity.state?.trust || 0) * (connectedEntity.state?.trust || 0);
-                if (isFinite(compatibility) && compatibility > mlConfig.quantum.entanglementThreshold) {
+              if (connectedEntity && i < quantum.qubits.length && j < quantum.qubits.length) {
+                const qubit1 = quantum.qubits[i];
+                const qubit2 = quantum.qubits[j];
+                
+                // Calculate quantum entanglement based on state correlation
+                const stateCorrelation = Math.abs(
+                  qubit1.state[0] * qubit2.state[0] + qubit1.state[1] * qubit2.state[1]
+                );
+                
+                // Calculate entanglement entropy
+                const entropy = quantumMechanics.entanglementEntropy(qubit1.state, qubit2.state);
+                
+                // Trust and innovation compatibility
+                const trustCompatibility = (entity.state?.trust || 0) * (connectedEntity.state?.trust || 0);
+                const innovationCompatibility = Math.abs((entity.state?.innovation || 0) - (connectedEntity.state?.innovation || 0));
+                
+                // Combined entanglement measure
+                const entanglement = (stateCorrelation * 0.4 + entropy * 0.3 + trustCompatibility * 0.3) * 
+                                   (1 - innovationCompatibility * 0.5);
+                
+                if (isFinite(entanglement) && entanglement > mlConfig.quantum.entanglementThreshold) {
                   const key = [i, j].sort().join('-');
-                  quantum.entanglements.set(key, compatibility);
+                  quantum.entanglements.set(key, entanglement);
+                  
+                  // Update entity quantum entanglement state
+                  if (i < businessEntities.length) {
+                    setBusinessEntities(prev => prev.map((e, idx) => 
+                      idx === i ? {
+                        ...e,
+                        mlState: {
+                          ...e.mlState,
+                          quantumEntanglement: entanglement
+                        }
+                      } : e
+                    ));
+                  }
                 }
               }
             }
@@ -1195,16 +1452,22 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
         }
       });
 
+      // Update global quantum coherence
       const avgCoherence = businessEntities.reduce((sum, entity) => 
         sum + (entity.state?.coherence || 0), 0) / Math.max(businessEntities.length, 1);
+      
+      const superpositionCount = quantum.qubits.filter(q => q.superposition).length;
+      const superpositionRatio = superpositionCount / quantum.qubits.length;
+      
       quantum.coherence = isFinite(avgCoherence) ? 
-        Math.max(0, Math.min(1, quantum.coherence * mlConfig.quantum.coherenceDecay + avgCoherence * (1 - mlConfig.quantum.coherenceDecay))) : 
+        Math.max(0, Math.min(1, quantum.coherence * mlConfig.quantum.coherenceDecay + 
+                              avgCoherence * (1 - mlConfig.quantum.coherenceDecay) * superpositionRatio)) : 
         quantum.coherence * mlConfig.quantum.coherenceDecay;
 
       quantum.lastUpdate = currentTime;
       return { ...prev, quantumSystem: quantum };
     });
-  }, [businessEntities, mlConfig, currentTime]);
+  }, [businessEntities, mlConfig, currentTime, quantumMechanics]);
 
   // Enriched: Added Q-learning training step for entity action selection (e.g., decide to innovate, connect, optimize)
   const trainQLearningStep = useCallback(() => {
