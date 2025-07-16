@@ -1,0 +1,2269 @@
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import * as THREE from 'three';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ScatterChart, Scatter, AreaChart, Area, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+import { Play, Pause, RotateCcw, Download, Settings, Zap, Activity, TrendingUp, Network, Cpu, Database, GitBranch, Brain, Layers, Target, FileText, Eye, Cog } from 'lucide-react';
+
+const UnifiedPESTLEMaxwellMLSystem = () => {
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [activeModule, setActiveModule] = useState('overview');
+  const [pestleFactors, setPestleFactors] = useState({
+    political: 0.5,
+    economic: 0.7,
+    social: 0.6,
+    technological: 0.8,
+    legal: 0.4,
+    environmental: 0.3
+  });
+  const [matrix6D, setMatrix6D] = useState({
+    innovation: 0.847,
+    trust: 0.623,
+    prestige: 0.791,
+    wants: 0.534,
+    needs: 0.712,
+    coherence: 0.889
+  });
+
+  const [businessEntities, setBusinessEntities] = useState(() => {
+    const sectors = ['Technology', 'Healthcare', 'Finance', 'Energy', 'Consumer', 'Industrial', 'Transportation', 'Media'];
+    const types = ['Enterprise', 'Academic', 'Government', 'Media'];
+    const names = ['Alpha Corp', 'Beta Industries', 'Gamma Tech', 'Delta Solutions', 'Epsilon Labs', 'Zeta Dynamics', 'Sigma Systems', 'Omega Networks'];
+    const entities = Array.from({ length: 50 }, (_, i) => {
+      const type = types[i % types.length];
+      const sector = sectors[i % sectors.length];
+      const baseMarketCap = type === 'Enterprise' ? 50e9 : type === 'Academic' ? 2e9 : type === 'Government' ? 10e9 : 1e9;
+      const marketCap = baseMarketCap * (0.5 + (i / 50) * 1.5);
+      const innovation = type === 'Academic' ? 0.8 : type === 'Government' ? 0.6 : 0.7;
+      const trust = type === 'Government' ? 0.8 : type === 'Academic' ? 0.85 : 0.7;
+      const prestige = Math.log(marketCap / 1e9) / 10;
+      return {
+        id: i + 1,
+        name: `${names[i % names.length]} ${i + 1}`,
+        type,
+        sector,
+        marketCap,
+        innovation,
+        trust,
+        prestige,
+        influence: innovation * trust * Math.log(marketCap / 1e9) / 20,
+        learningTokens: 500 + (i * 10),
+        spatialEfficiency: 0.5 + (i / 100),
+        tokenHistory: [],
+        position: {
+          x: (i % 10 - 4.5) * 16,
+          y: (Math.floor(i / 10) - 2.5) * 16,
+          z: ((i % 5) - 2) * 8
+        },
+        velocity: { x: 0, y: 0, z: 0 },
+        acceleration: { x: 0, y: 0, z: 0 },
+        forces: {},
+        connections: [],
+        mass: 1 + Math.log(marketCap / 1e9) / 10,
+        charge: innovation,
+        radius: 3 + Math.sqrt(marketCap / 1e10),
+        activity: 0.3 + (innovation * 0.4),
+        state: {
+          innovation,
+          trust,
+          prestige,
+          wants: 0.4 + (i % 10) * 0.06,
+          needs: 0.5 + (i % 8) * 0.0625,
+          coherence: 0.6 + (innovation * trust * 0.4)
+        },
+        mlState: {
+          neuralActivation: Math.random(),
+          bayesianBelief: 0.5,
+          quantumEntanglement: 0,
+          xorPattern: '0000',
+          spatialEncoding: null,
+          learningRate: 0.01,
+          confidence: 0.5
+        }
+      };
+    });
+    entities.forEach((entity, i) => {
+      const connections = [];
+      for (let j = 1; j <= 3; j++) {
+        const targetIndex = (i + j) % entities.length;
+        if (targetIndex !== i) {
+          connections.push(entities[targetIndex].id);
+        }
+      }
+      entity.connections = connections;
+    });
+    return entities;
+  });
+
+  const [v24State, setV24State] = useState({
+    memoryUsage: 198,
+    latency: 2.8,
+    tensorOps: 1800,
+    gpuUtilization: 95,
+    performanceGain: 400,
+    hilbertOrder: 6,
+    voxelCount: 10800,
+    spatialEfficiency: 98.2,
+    cacheHitRate: 96,
+    convergenceRate: 98.7
+  });
+
+  const [systemMetrics, setSystemMetrics] = useState({
+    v24Transformer: { performance: 94.2, memoryUsage: 847, throughput: 2.4 },
+    gpuCompute: { utilization: 87.3, gflops: 4.8, powerDraw: 245 },
+    networkAnalyzer: { nodeCount: 50, edgeCount: 150, clusterCount: 12 },
+    mlEngine: { accuracy: 92.7, trainingLoss: 0.0234, predictionConfidence: 89.1 }
+  });
+
+  const [tensorState, setTensorState] = useState({
+    activeTokens: 65536,
+    hilbertOrder: 8,
+    activeLayers: 21,
+    processingNodes: 256,
+    tensorShape: [256, 256, 6],
+    tokenizedData: null,
+    hilbertCurve: null,
+    gpuBuffers: null,
+    computeShaderCompiled: false,
+    workgroupSize: [256, 1, 1],
+    parallelOps: 65536,
+    hierarchicalLevels: 8,
+    attentionHeads: 16,
+    embeddingDim: 1024,
+    spatialEncoding: true,
+    curveLearning: true,
+    currentLayerType: 'idle'
+  });
+
+  const [mlConfig, setMLConfig] = useState({
+    neuralNetwork: {
+      inputSize: 18,
+      hiddenSize1: 64, // Enriched: added more hidden layers
+      hiddenSize2: 32,
+      outputSize: 12,
+      learningRate: 0.005, // Adjusted for better convergence
+      maxEpochs: 2000,
+      targetAccuracy: 0.98,
+      isTraining: false
+    },
+    xorNetwork: {
+      learningRate: 0.3,
+      maxEpochs: 2000,
+      targetLoss: 0.005,
+      isTraining: false
+    },
+    bayesian: {
+      nodeCount: () => businessEntities.length,
+      updateRate: 0.1,
+      evidenceThreshold: 0.5
+    },
+    quantum: {
+      coherenceDecay: 0.99,
+      entanglementThreshold: 0.6,
+      superpositionRange: 0.1
+    },
+    // Enriched: Added simple Q-learning config for entity decision simulation
+    qLearning: {
+      alpha: 0.1, // Learning rate
+      gamma: 0.9, // Discount factor
+      epsilon: 0.1, // Exploration rate
+      actions: ['innovate', 'connect', 'optimize'], // Sample actions
+      isTraining: false
+    }
+  });
+
+  const [mlSystem, setMLSystem] = useState(() => {
+    const initializeWeights = (rows, cols) => 
+      Array.from({ length: rows }, () => 
+        Array.from({ length: cols }, () => (Math.random() - 0.5) * Math.sqrt(2 / (rows + cols))));
+
+    const initializeBias = (size) => 
+      Array.from({ length: size }, () => (Math.random() - 0.5) * 0.1);
+
+    return {
+      neuralNetwork: {
+        weights1: initializeWeights(18, 64), // Enriched: deeper network
+        weights2: initializeWeights(64, 32),
+        hiddenWeights: initializeWeights(32, 12),
+        bias1: initializeBias(64),
+        bias2: initializeBias(32),
+        outputBias: initializeBias(12),
+        epochs: 0,
+        loss: 1.0,
+        accuracy: 0,
+        lastUpdate: 0
+      },
+      xorNetwork: {
+        weights: {
+          hidden: initializeWeights(3, 2),
+          output: initializeBias(3)
+        },
+        biases: {
+          hidden: initializeBias(3),
+          output: (Math.random() - 0.5) * 0.1
+        },
+        accuracy: 0,
+        epoch: 0,
+        loss: 1.0,
+        lastUpdate: 0
+      },
+      bayesianNetwork: {
+        nodes: [],
+        structure: new Map(),
+        beliefs: [],
+        lastUpdate: 0
+      },
+      quantumSystem: {
+        qubits: [],
+        entanglements: new Map(),
+        coherence: 1.0,
+        gateSequence: [],
+        lastUpdate: 0
+      },
+      // Enriched: Added Q-table for Q-learning
+      qLearning: {
+        qTable: new Map(), // State-action values
+        lastUpdate: 0
+      }
+    };
+  });
+
+  const [forceData, setForceData] = useState([]);
+  const [networkData, setNetworkData] = useState([]);
+  const [mlPredictions, setMLPredictions] = useState(null);
+  const [systemAlerts, setSystemAlerts] = useState([
+    { type: 'success', message: 'V24 Ultra ML System initialized', timestamp: 'now' },
+    { type: 'info', message: 'Neural networks ready for training', timestamp: 'now' },
+    { type: 'success', message: 'Quantum entanglement system active', timestamp: 'now' },
+    { type: 'info', message: 'Bayesian belief propagation enabled', timestamp: 'now' }
+  ]);
+  const [dataFeed, setDataFeed] = useState([]);
+  const canvasRef = useRef(null);
+  const hilbertCanvasRef = useRef(null);
+  const heatmapCanvasRef = useRef(null);
+
+  const sigmoid = useCallback((x) => {
+    if (!isFinite(x)) return x > 0 ? 1 : 0;
+    const clampedX = Math.max(-500, Math.min(500, x));
+    const result = 1 / (1 + Math.exp(-clampedX));
+    return isFinite(result) ? result : (clampedX > 0 ? 1 : 0);
+  }, []);
+
+  const relu = useCallback((x) => {
+    if (!isFinite(x)) return 0;
+    return Math.max(0, x);
+  }, []);
+
+  const safeAdd = useCallback((a, b) => {
+    const result = a + b;
+    return isFinite(result) ? result : 0;
+  }, []);
+
+  const safeMult = useCallback((a, b) => {
+    const result = a * b;
+    return isFinite(result) ? result : 0;
+  }, []);
+
+  const normalizeArray = useCallback((arr) => {
+    const sum = arr.reduce((s, val) => s + Math.abs(val), 0);
+    if (sum === 0 || !isFinite(sum)) return arr.map(() => 0);
+    return arr.map(val => val / sum);
+  }, []);
+
+  const toggleNeuralNetworkTraining = useCallback(() => {
+    setMLConfig(prev => ({
+      ...prev,
+      neuralNetwork: {
+        ...prev.neuralNetwork,
+        isTraining: !prev.neuralNetwork.isTraining
+      }
+    }));
+  }, []);
+
+  const toggleXORNetworkTraining = useCallback(() => {
+    setMLConfig(prev => ({
+      ...prev,
+      xorNetwork: {
+        ...prev.xorNetwork,
+        isTraining: !prev.xorNetwork.isTraining
+      }
+    }));
+  }, []);
+
+  const toggleQLearningTraining = useCallback(() => {
+    setMLConfig(prev => ({
+      ...prev,
+      qLearning: {
+        ...prev.qLearning,
+        isTraining: !prev.qLearning.isTraining
+      }
+    }));
+  }, []);
+
+  const trainNeuralNetworkStep = useCallback(() => {
+    if (!mlConfig.neuralNetwork.isTraining) return;
+
+    const extractFeatures = (entity) => {
+      const features = [
+        pestleFactors.political || 0, pestleFactors.economic || 0, pestleFactors.social || 0,
+        pestleFactors.technological || 0, pestleFactors.legal || 0, pestleFactors.environmental || 0,
+        entity.innovation || 0, entity.trust || 0, entity.prestige || 0,
+        entity.state?.wants || 0, entity.state?.needs || 0, entity.state?.coherence || 0,
+        Math.log(Math.max(entity.marketCap, 1e6) / 1e9) / 10, entity.influence || 0,
+        (entity.position?.x || 0) / 100, (entity.position?.y || 0) / 100, (entity.position?.z || 0) / 100,
+        entity.mlState?.confidence || 0.5
+      ];
+      return features.map(f => isFinite(f) ? f : 0);
+    };
+
+    const extractTarget = (entity) => {
+      const target = [
+        entity.state?.innovation || 0, entity.state?.trust || 0, entity.state?.prestige || 0,
+        entity.state?.wants || 0, entity.state?.needs || 0, entity.state?.coherence || 0,
+        entity.mlState?.neuralActivation || 0, entity.mlState?.bayesianBelief || 0.5,
+        entity.influence || 0, entity.spatialEfficiency || 0.5,
+        Math.sin((entity.position?.x || 0) / 50), Math.cos((entity.position?.y || 0) / 50)
+      ];
+      return target.map(t => isFinite(t) ? Math.max(0, Math.min(1, t)) : 0.5);
+    };
+
+    const trainingData = businessEntities.map(entity => ({
+      features: extractFeatures(entity),
+      target: extractTarget(entity)
+    })).filter(data => data.features.every(f => isFinite(f)) && data.target.every(t => isFinite(t)));
+
+    if (trainingData.length === 0) return;
+
+    setMLSystem(prev => {
+      const nn = { ...prev.neuralNetwork };
+      let totalLoss = 0;
+      let correct = 0;
+      const batchSize = Math.min(16, trainingData.length); // Enriched: larger batch for better convergence
+      const selectedData = trainingData.slice(0, batchSize);
+
+      selectedData.forEach(({ features, target }) => {
+        // Forward pass with deeper network
+        const hidden1 = nn.weights1.map((neuronWeights, i) => {
+          const sum = features.reduce((acc, val, j) => 
+            safeAdd(acc, safeMult(val, neuronWeights[j] || 0)), 0) + (nn.bias1[i] || 0);
+          return relu(sum); // Enriched: use ReLU for hidden layers
+        });
+
+        const hidden2 = nn.weights2.map((neuronWeights, i) => {
+          const sum = hidden1.reduce((acc, val, j) => 
+            safeAdd(acc, safeMult(val, neuronWeights[j] || 0)), 0) + (nn.bias2[i] || 0);
+          return relu(sum);
+        });
+
+        const output = nn.hiddenWeights.map((neuronWeights, i) => {
+          const sum = hidden2.reduce((acc, val, j) => 
+            safeAdd(acc, safeMult(val, neuronWeights[j] || 0)), 0) + (nn.outputBias[i] || 0);
+          return sigmoid(sum);
+        });
+
+        const error = target.map((t, i) => t - output[i]).filter(e => isFinite(e));
+        const loss = error.reduce((sum, e) => sum + e * e, 0) / Math.max(error.length, 1);
+
+        if (isFinite(loss) && !isNaN(loss)) {
+          totalLoss += loss;
+          if (loss < 0.05) correct++;
+        }
+
+        const learningRate = mlConfig.neuralNetwork.learningRate;
+
+        // Backprop for output layer
+        const outputDeltas = error.map((e, i) => e * output[i] * (1 - output[i]));
+        for (let i = 0; i < nn.hiddenWeights.length; i++) {
+          const outputDelta = outputDeltas[i];
+          if (isFinite(outputDelta)) {
+            for (let j = 0; j < hidden2.length; j++) {
+              const update = learningRate * outputDelta * hidden2[j];
+              if (isFinite(update)) {
+                nn.hiddenWeights[i][j] = (nn.hiddenWeights[i][j] || 0) + update;
+                nn.hiddenWeights[i][j] = Math.max(-10, Math.min(10, nn.hiddenWeights[i][j]));
+              }
+            }
+            const biasUpdate = learningRate * outputDelta;
+            if (isFinite(biasUpdate)) {
+              nn.outputBias[i] = (nn.outputBias[i] || 0) + biasUpdate;
+              nn.outputBias[i] = Math.max(-10, Math.min(10, nn.outputBias[i]));
+            }
+          }
+        }
+
+        // Backprop for second hidden layer
+        const hidden2Deltas = hidden2.map((h, i) => {
+          const errorSum = outputDeltas.reduce((sum, delta, k) => safeAdd(sum, safeMult(delta, nn.hiddenWeights[k][i] || 0)), 0);
+          return errorSum * (h > 0 ? 1 : 0); // ReLU derivative
+        });
+        for (let i = 0; i < nn.weights2.length; i++) {
+          const hiddenDelta = hidden2Deltas[i];
+          if (isFinite(hiddenDelta)) {
+            for (let j = 0; j < hidden1.length; j++) {
+              const update = learningRate * hiddenDelta * hidden1[j];
+              if (isFinite(update)) {
+                nn.weights2[i][j] = (nn.weights2[i][j] || 0) + update;
+                nn.weights2[i][j] = Math.max(-10, Math.min(10, nn.weights2[i][j]));
+              }
+            }
+            const biasUpdate = learningRate * hiddenDelta;
+            if (isFinite(biasUpdate)) {
+              nn.bias2[i] = (nn.bias2[i] || 0) + biasUpdate;
+              nn.bias2[i] = Math.max(-10, Math.min(10, nn.bias2[i]));
+            }
+          }
+        }
+
+        // Backprop for first hidden layer
+        const hidden1Deltas = hidden1.map((h, i) => {
+          const errorSum = hidden2Deltas.reduce((sum, delta, k) => safeAdd(sum, safeMult(delta, nn.weights2[k][i] || 0)), 0);
+          return errorSum * (h > 0 ? 1 : 0);
+        });
+        for (let i = 0; i < nn.weights1.length; i++) {
+          const hiddenDelta = hidden1Deltas[i];
+          if (isFinite(hiddenDelta)) {
+            for (let j = 0; j < features.length; j++) {
+              const update = learningRate * hiddenDelta * features[j];
+              if (isFinite(update)) {
+                nn.weights1[i][j] = (nn.weights1[i][j] || 0) + update;
+                nn.weights1[i][j] = Math.max(-10, Math.min(10, nn.weights1[i][j]));
+              }
+            }
+            const biasUpdate = learningRate * hiddenDelta;
+            if (isFinite(biasUpdate)) {
+              nn.bias1[i] = (nn.bias1[i] || 0) + biasUpdate;
+              nn.bias1[i] = Math.max(-10, Math.min(10, nn.bias1[i]));
+            }
+          }
+        }
+      });
+
+      nn.loss = isFinite(totalLoss) ? totalLoss / Math.max(selectedData.length, 1) : 1.0;
+      nn.accuracy = selectedData.length > 0 ? correct / selectedData.length : 0;
+      nn.epochs++;
+      nn.lastUpdate = currentTime;
+
+      if (nn.accuracy >= mlConfig.neuralNetwork.targetAccuracy || 
+        nn.epochs >= mlConfig.neuralNetwork.maxEpochs) {
+        setMLConfig(prevConfig => ({
+          ...prevConfig,
+          neuralNetwork: { ...prevConfig.neuralNetwork, isTraining: false }
+        }));
+      }
+
+      return { ...prev, neuralNetwork: nn };
+    });
+  }, [businessEntities, pestleFactors, relu, sigmoid, safeAdd, safeMult, mlConfig, currentTime]);
+
+  // XOR training remains the same, but with adjusted rate for convergence
+
+  const trainXORNetworkStep = useCallback(() => {
+    if (!mlConfig.xorNetwork.isTraining) return;
+
+    const trainingData = [
+      { input: [0, 0], target: 0 },
+      { input: [0, 1], target: 1 },
+      { input: [1, 0], target: 1 },
+      { input: [1, 1], target: 0 }
+    ];
+
+    setMLSystem(prev => {
+      const xor = { ...prev.xorNetwork };
+      let totalLoss = 0;
+
+      trainingData.forEach(data => {
+        const hidden = xor.weights.hidden.map((neuronWeights, i) => {
+          const sum = safeMult(neuronWeights[0] || 0, data.input[0]) + 
+            safeMult(neuronWeights[1] || 0, data.input[1]) + 
+            (xor.biases.hidden[i] || 0);
+          return sigmoid(sum);
+        });
+
+        const outputSum = hidden.reduce((sum, h, i) => 
+          safeAdd(sum, safeMult(h, xor.weights.output[i] || 0)), 0) + (xor.biases.output || 0);
+        const output = sigmoid(outputSum);
+
+        const error = data.target - output;
+        if (isFinite(error)) {
+          totalLoss += error * error;
+
+          const outputDelta = error * output * (1 - output);
+          if (isFinite(outputDelta)) {
+            const learningRate = mlConfig.xorNetwork.learningRate;
+
+            hidden.forEach((h, i) => {
+              if (i < xor.weights.output.length) {
+                const update = learningRate * outputDelta * h;
+                if (isFinite(update)) {
+                  xor.weights.output[i] = (xor.weights.output[i] || 0) + update;
+                  xor.weights.output[i] = Math.max(-10, Math.min(10, xor.weights.output[i]));
+                }
+              }
+            });
+
+            const biasUpdate = learningRate * outputDelta;
+            if (isFinite(biasUpdate)) {
+              xor.biases.output = (xor.biases.output || 0) + biasUpdate;
+              xor.biases.output = Math.max(-10, Math.min(10, xor.biases.output));
+            }
+
+            hidden.forEach((h, i) => {
+              if (i < xor.weights.hidden.length) {
+                const hiddenDelta = outputDelta * (xor.weights.output[i] || 0) * h * (1 - h);
+                if (isFinite(hiddenDelta)) {
+                  const update0 = learningRate * hiddenDelta * data.input[0];
+                  const update1 = learningRate * hiddenDelta * data.input[1];
+                  if (isFinite(update0) && isFinite(update1)) {
+                    xor.weights.hidden[i][0] = (xor.weights.hidden[i][0] || 0) + update0;
+                    xor.weights.hidden[i][1] = (xor.weights.hidden[i][1] || 0) + update1;
+                    xor.weights.hidden[i][0] = Math.max(-10, Math.min(10, xor.weights.hidden[i][0]));
+                    xor.weights.hidden[i][1] = Math.max(-10, Math.min(10, xor.weights.hidden[i][1]));
+                  }
+                  const hiddenBiasUpdate = learningRate * hiddenDelta;
+                  if (isFinite(hiddenBiasUpdate)) {
+                    xor.biases.hidden[i] = (xor.biases.hidden[i] || 0) + hiddenBiasUpdate;
+                    xor.biases.hidden[i] = Math.max(-10, Math.min(10, xor.biases.hidden[i]));
+                  }
+                }
+              }
+            });
+          }
+        }
+      });
+
+      xor.loss = isFinite(totalLoss) ? totalLoss / trainingData.length : 1.0;
+      xor.epoch++;
+      xor.lastUpdate = currentTime;
+
+      let correct = 0;
+      trainingData.forEach(data => {
+        const hidden = xor.weights.hidden.map((neuronWeights, i) => {
+          const sum = safeMult(neuronWeights[0] || 0, data.input[0]) + 
+            safeMult(neuronWeights[1] || 0, data.input[1]) + 
+            (xor.biases.hidden[i] || 0);
+          return sigmoid(sum);
+        });
+        const outputSum = hidden.reduce((sum, h, i) => 
+          safeAdd(sum, safeMult(h, xor.weights.output[i] || 0)), 0) + (xor.biases.output || 0);
+        const output = sigmoid(outputSum);
+        const prediction = output > 0.5 ? 1 : 0;
+        if (prediction === data.target) correct++;
+      });
+
+      xor.accuracy = correct / trainingData.length;
+
+      if (xor.loss <= mlConfig.xorNetwork.targetLoss || 
+        xor.epoch >= mlConfig.xorNetwork.maxEpochs) {
+        setMLConfig(prevConfig => ({
+          ...prevConfig,
+          xorNetwork: { ...prevConfig.xorNetwork, isTraining: false }
+        }));
+      }
+
+      return { ...prev, xorNetwork: xor };
+    });
+  }, [sigmoid, safeAdd, safeMult, mlConfig, currentTime]);
+
+  const updateBayesianNetwork = useCallback(() => {
+    setMLSystem(prev => {
+      const bayesian = { ...prev.bayesianNetwork };
+      const nodeCount = businessEntities.length;
+
+      if (bayesian.nodes.length !== nodeCount) {
+        bayesian.nodes = Array.from({ length: nodeCount }, (_, i) => ({
+          id: i,
+          belief: 0.5,
+          evidence: 0,
+          parents: [],
+          children: [],
+          conditionalProbabilities: new Map()
+        }));
+        bayesian.beliefs = new Array(nodeCount).fill(0.5);
+      }
+
+      businessEntities.forEach((entity, i) => {
+        if (i < bayesian.nodes.length) {
+          const node = bayesian.nodes[i];
+          const evidence = (entity.state?.innovation || 0) * (entity.state?.trust || 0) * (entity.state?.coherence || 0);
+
+          if (isFinite(evidence)) {
+            node.evidence = Math.max(0, Math.min(1, evidence));
+            const priorBelief = node.belief || 0.5;
+            const likelihood = evidence > mlConfig.bayesian.evidenceThreshold ? 0.8 : 0.2;
+            const marginal = (likelihood * priorBelief) + ((1 - likelihood) * (1 - priorBelief));
+            const posteriorBelief = marginal > 0 ? (likelihood * priorBelief) / marginal : priorBelief;
+
+            if (isFinite(posteriorBelief)) {
+              node.belief = Math.max(0, Math.min(1, posteriorBelief));
+              bayesian.beliefs[i] = node.belief;
+            }
+          }
+        }
+      });
+
+      bayesian.lastUpdate = currentTime;
+      return { ...prev, bayesianNetwork: bayesian };
+    });
+  }, [businessEntities, mlConfig, currentTime]);
+
+  const updateQuantumSystem = useCallback(() => {
+    setMLSystem(prev => {
+      const quantum = { ...prev.quantumSystem };
+      const nodeCount = businessEntities.length;
+
+      if (quantum.qubits.length !== nodeCount) {
+        quantum.qubits = Array.from({ length: nodeCount }, () => ({ 
+          state: 0, 
+          superposition: false 
+        }));
+      }
+
+      businessEntities.forEach((entity, i) => {
+        if (i < quantum.qubits.length) {
+          const qubit = quantum.qubits[i];
+          const innovation = entity.state?.innovation || 0;
+          qubit.state = innovation > 0.5 ? 1 : 0;
+          qubit.superposition = Math.abs(innovation - 0.5) < mlConfig.quantum.superpositionRange;
+        }
+      });
+
+      quantum.entanglements.clear();
+      businessEntities.forEach((entity, i) => {
+        if (entity.connections && Array.isArray(entity.connections)) {
+          entity.connections.forEach(connId => {
+            const j = connId - 1;
+            if (j >= 0 && j < quantum.qubits.length && j !== i) {
+              const connectedEntity = businessEntities[j];
+              if (connectedEntity) {
+                const compatibility = (entity.state?.trust || 0) * (connectedEntity.state?.trust || 0);
+                if (isFinite(compatibility) && compatibility > mlConfig.quantum.entanglementThreshold) {
+                  const key = [i, j].sort().join('-');
+                  quantum.entanglements.set(key, compatibility);
+                }
+              }
+            }
+          });
+        }
+      });
+
+      const avgCoherence = businessEntities.reduce((sum, entity) => 
+        sum + (entity.state?.coherence || 0), 0) / Math.max(businessEntities.length, 1);
+      quantum.coherence = isFinite(avgCoherence) ? 
+        Math.max(0, Math.min(1, quantum.coherence * mlConfig.quantum.coherenceDecay + avgCoherence * (1 - mlConfig.quantum.coherenceDecay))) : 
+        quantum.coherence * mlConfig.quantum.coherenceDecay;
+
+      quantum.lastUpdate = currentTime;
+      return { ...prev, quantumSystem: quantum };
+    });
+  }, [businessEntities, mlConfig, currentTime]);
+
+  // Enriched: Added Q-learning training step for entity action selection (e.g., decide to innovate, connect, optimize)
+  const trainQLearningStep = useCallback(() => {
+    if (!mlConfig.qLearning.isTraining) return;
+
+    setMLSystem(prev => {
+      const ql = { ...prev.qLearning };
+      businessEntities.forEach(entity => {
+        const stateKey = `${Math.round(entity.state.innovation * 10)}-${Math.round(entity.state.trust * 10)}`; // Simple state discretization
+        if (!ql.qTable.has(stateKey)) {
+          ql.qTable.set(stateKey, mlConfig.qLearning.actions.map(() => Math.random() * 0.1));
+        }
+
+        // Simulate episode
+        const qValues = ql.qTable.get(stateKey);
+        let actionIndex;
+        if (Math.random() < mlConfig.qLearning.epsilon) {
+          actionIndex = Math.floor(Math.random() * mlConfig.qLearning.actions.length);
+        } else {
+          actionIndex = qValues.indexOf(Math.max(...qValues));
+        }
+
+        // Simulate reward based on action
+        let reward = 0;
+        if (mlConfig.qLearning.actions[actionIndex] === 'innovate') {
+          reward = entity.state.innovation > 0.7 ? 1 : -0.5;
+        } else if (mlConfig.qLearning.actions[actionIndex] === 'connect') {
+          reward = entity.connections.length > 2 ? 1 : -0.5;
+        } else if (mlConfig.qLearning.actions[actionIndex] === 'optimize') {
+          reward = entity.state.coherence > 0.8 ? 1 : -0.5;
+        }
+
+        // Next state
+        const nextStateKey = `${Math.round((entity.state.innovation + reward * 0.1) * 10)}-${Math.round(entity.state.trust * 10)}`;
+        if (!ql.qTable.has(nextStateKey)) {
+          ql.qTable.set(nextStateKey, mlConfig.qLearning.actions.map(() => Math.random() * 0.1));
+        }
+        const nextQValues = ql.qTable.get(nextStateKey);
+        const maxNextQ = Math.max(...nextQValues);
+
+        // Update Q
+        qValues[actionIndex] += mlConfig.qLearning.alpha * (reward + mlConfig.qLearning.gamma * maxNextQ - qValues[actionIndex]);
+      });
+
+      ql.lastUpdate = currentTime;
+      return { ...prev, qLearning: ql };
+    });
+  }, [businessEntities, mlConfig, currentTime]);
+
+  const generateHilbertCurve = useCallback((order) => {
+    const n = Math.pow(2, order);
+    const curve = [];
+    const hilbert = (x, y, xi, xj, yi, yj, n) => {
+      if (n <= 0) {
+        curve.push({ x: x + (xi + yi) / 2, y: y + (xj + yj) / 2 });
+      } else {
+        hilbert(x, y, yi / 2, yj / 2, xi / 2, xj / 2, n - 1);
+        hilbert(x + xi / 2, y + xj / 2, xi / 2, xj / 2, yi / 2, yj / 2, n - 1);
+        hilbert(x + xi / 2 + yi / 2, y + xj / 2 + yj / 2, xi / 2, xj / 2, yi / 2, yj / 2, n - 1);
+        hilbert(x + xi / 2 + yi, y + xj / 2 + yj, -yi / 2, -yj / 2, -xi / 2, -xj / 2, n - 1);
+      }
+    };
+    hilbert(0, 0, n, 0, 0, n, order);
+    return curve;
+  }, []);
+
+  const tokenizeHeatMap = useCallback((matrix6D, businessEntities) => {
+    const tensor = Array(50).fill(null).map((_, nodeIndex) => {
+      const entity = businessEntities[nodeIndex] || businessEntities[nodeIndex % businessEntities.length];
+      return [
+        [matrix6D.innovation, matrix6D.trust, matrix6D.prestige, entity.innovation, entity.trust, entity.influence],
+        [matrix6D.trust, matrix6D.coherence, matrix6D.wants, entity.state.trust, entity.state.wants, entity.activity],
+        [matrix6D.prestige, matrix6D.wants, matrix6D.needs, entity.state.prestige, entity.state.needs, entity.radius],
+        [entity.innovation, entity.state.trust, entity.state.prestige, entity.mlState.neuralActivation, entity.mlState.bayesianBelief, entity.mlState.confidence],
+        [entity.trust, entity.state.wants, entity.state.needs, entity.mlState.quantumEntanglement, entity.spatialEfficiency, entity.learningTokens / 1000],
+        [entity.influence, entity.activity, entity.radius, entity.mass, Math.log(entity.marketCap / 1e9) / 10, entity.charge]
+      ];
+    });
+    const tokens = tensor.flat(2).map((value, index) => ({
+      id: index,
+      value: value,
+      attention: Math.random() * 0.5 + 0.5,
+      layer: Math.floor(index / (50 * 6)),
+      position: {
+        node: Math.floor(index / 36),
+        matrix_i: Math.floor((index % 36) / 6),
+        matrix_j: index % 6
+      }
+    }));
+    return { tensor, tokens };
+  }, []);
+
+  const processTransformerLayers = useCallback((tokens) => {
+    const layers = [];
+    const numLayers = 8; // Enriched: more layers for deeper processing
+    const attentionHeads = 32; // Enriched: more heads
+    for (let layer = 0; layer < numLayers; layer++) {
+      const layerTokens = tokens.map(token => ({ ...token }));
+      layerTokens.forEach((token, i) => {
+        const attentionSum = layerTokens.reduce((sum, otherToken, j) => {
+          if (i !== j) {
+            const distance = Math.abs(token.position.node - otherToken.position.node);
+            const attention = Math.exp(-distance / 10);
+            return sum + attention * otherToken.value;
+          }
+          return sum;
+        }, 0);
+        token.value = token.value + (attentionSum / layerTokens.length) * 0.1;
+        token.attention = Math.min(1, token.attention + (Math.random() - 0.5) * 0.1);
+        token.layer = layer;
+      });
+      layers.push(layerTokens);
+    }
+    const transformerOutput = layers[layers.length - 1];
+    const layerAnalysis = {};
+    layers.forEach((layerTokens, layerIndex) => {
+      layerAnalysis[layerIndex] = layerTokens.map(token => ({
+        value: token.value,
+        attention: token.attention,
+        position: token.position
+      }));
+    });
+    return { transformerOutput, layerAnalysis };
+  }, []);
+
+  const bayesianInference = useCallback((transformerOutput, matrix6D) => {
+    const priors = {
+      innovation: 0.5,
+      trust: 0.5,
+      stability: 0.5,
+      growth: 0.5
+    };
+    const evidence = {
+      innovation: transformerOutput.filter(t => t.position.matrix_i === 0).reduce((sum, t) => sum + t.value, 0) / transformerOutput.length,
+      trust: transformerOutput.filter(t => t.position.matrix_i === 1).reduce((sum, t) => sum + t.value, 0) / transformerOutput.length,
+      stability: matrix6D.coherence,
+      growth: matrix6D.wants
+    };
+    const posteriors = {};
+    Object.keys(priors).forEach(key => {
+      const prior = priors[key];
+      const likelihood = evidence[key] > 0.5 ? 0.8 : 0.3;
+      posteriors[key] = (likelihood * prior) / ((likelihood * prior) + ((1 - likelihood) * (1 - prior)));
+    });
+    return posteriors;
+  }, []);
+
+  const runAdvancedMLAnalysis = useCallback(async () => {
+    try {
+      setSystemAlerts(prev => [{
+        type: 'info',
+        message: 'Starting advanced ML analysis with 50×6×6 tensor processing...',
+        timestamp: 'now'
+      }, ...prev.slice(0, 3)]);
+      const { tensor, tokens } = tokenizeHeatMap(matrix6D, businessEntities);
+      const { transformerOutput, layerAnalysis } = processTransformerLayers(tokens);
+      const bayesianPredictions = bayesianInference(transformerOutput, matrix6D);
+      const numLayers = 8; // Declare explicitly to match usage
+      const tensorInsights = {
+        innovation_momentum: transformerOutput.filter(t => t.position.matrix_i === 0).reduce((sum, t) => sum + t.value, 0) / transformerOutput.length,
+        trust_network_strength: transformerOutput.filter(t => t.position.matrix_i === 1).reduce((sum, t) => sum + t.value, 0) / transformerOutput.length,
+        system_coherence: transformerOutput.reduce((sum, t) => sum + t.attention, 0) / transformerOutput.length,
+        complexity_measure: layerAnalysis[numLayers - 1].reduce((sum, t) => sum + Math.abs(t.value), 0) / layerAnalysis[numLayers - 1].length
+      };
+      const scenarioAnalysis = {
+        optimistic: {
+          innovation: Math.min(1, matrix6D.innovation + tensorInsights.innovation_momentum * 0.2),
+          trust: Math.min(1, matrix6D.trust + tensorInsights.trust_network_strength * 0.15),
+          stability: Math.min(1, tensorInsights.system_coherence * 1.1)
+        },
+        pessimistic: {
+          innovation: Math.max(0, matrix6D.innovation - tensorInsights.innovation_momentum * 0.1),
+          trust: Math.max(0, matrix6D.trust - (1 - tensorInsights.trust_network_strength) * 0.1),
+          stability: Math.max(0, tensorInsights.system_coherence * 0.9)
+        },
+        neutral: {
+          innovation: matrix6D.innovation,
+          trust: matrix6D.trust,
+          stability: tensorInsights.system_coherence
+        }
+      };
+      const forceFieldAnalysis = {
+        dominant_force: transformerOutput.reduce((max, token) => token.value > max.value ? token : max, transformerOutput[0]).position.matrix_i < 3 ? 'Maxwell' : 'Lorentz',
+        stability: tensorInsights.system_coherence,
+        coherence: tensorInsights.trust_network_strength,
+        prediction_horizon: '7 days',
+        confidence: Object.values(bayesianPredictions).reduce((sum, val) => sum + val, 0) / 4
+      };
+      const nextStepPrediction = {
+        innovation: Math.max(0, Math.min(1, matrix6D.innovation + tensorInsights.innovation_momentum * 0.1)),
+        trust: Math.max(0, Math.min(1, matrix6D.trust + (tensorInsights.trust_network_strength - 0.5) * 0.05)),
+        marketStability: tensorInsights.system_coherence,
+        riskFactor: 1 - forceFieldAnalysis.confidence
+      };
+      const predictions = {
+        nextStepPrediction,
+        scenarioAnalysis,
+        forceFieldAnalysis,
+        bayesianPredictions,
+        tensorInsights,
+        layerAnalysis: Object.keys(layerAnalysis).map(layer => ({
+          layer: parseInt(layer),
+          avgValue: layerAnalysis[layer].reduce((sum, t) => sum + t.value, 0) / layerAnalysis[layer].length,
+          tokenCount: layerAnalysis[layer].length,
+          maxAttention: Math.max(...layerAnalysis[layer].map(t => t.attention || 0))
+        }))
+      };
+      setMLPredictions(predictions);
+      setTensorState(prev => ({
+        ...prev,
+        tokenizedData: tokens,
+        activeLayers: 8 // Updated
+      }));
+      setSystemAlerts(prev => [{
+        type: 'info',
+        message: `Advanced ML analysis completed - Confidence: ${(forceFieldAnalysis.confidence * 100).toFixed(1)}%`,
+        timestamp: 'now'
+      }, ...prev.slice(0, 3)]);
+    } catch (error) {
+      console.error('ML Analysis error:', error);
+      setSystemAlerts(prev => [{
+        type: 'error',
+        message: 'ML analysis pipeline error - check tensor processing',
+        timestamp: 'now'
+      }, ...prev.slice(0, 3)]);
+    }
+  }, [matrix6D, businessEntities, tokenizeHeatMap, processTransformerLayers, bayesianInference]);
+
+  const runMLTrainingCycle = useCallback(() => {
+    if (mlConfig.neuralNetwork.isTraining) {
+      trainNeuralNetworkStep();
+    }
+    if (mlConfig.xorNetwork.isTraining) {
+      trainXORNetworkStep();
+    }
+    if (mlConfig.qLearning.isTraining) {
+      trainQLearningStep();
+    }
+    updateBayesianNetwork();
+    updateQuantumSystem();
+
+    const isAnyTraining = mlConfig.neuralNetwork.isTraining || mlConfig.xorNetwork.isTraining || mlConfig.qLearning.isTraining;
+    setSystemAlerts(prev => [{
+      type: 'success',
+      message: `ML cycle: NN ${mlConfig.neuralNetwork.isTraining ? 'Training' : 'Idle'} (${(mlSystem.neuralNetwork.accuracy * 100).toFixed(1)}%), XOR ${mlConfig.xorNetwork.isTraining ? 'Training' : 'Idle'} (${(mlSystem.xorNetwork.accuracy * 100).toFixed(1)}%), QL ${mlConfig.qLearning.isTraining ? 'Training' : 'Idle'}`,
+      timestamp: 'now'
+    }, ...prev.slice(0, 3)]);
+  }, [trainNeuralNetworkStep, trainXORNetworkStep, trainQLearningStep, updateBayesianNetwork, updateQuantumSystem, mlConfig, mlSystem]);
+
+  const calculateMatrixForce = useCallback((entity1, entity2, pestleFactors) => {
+    const dx = entity2.position.x - entity1.position.x;
+    const dy = entity2.position.y - entity1.position.y;
+    const dz = entity2.position.z - entity1.position.z;
+    const distance = Math.sqrt(dx*dx + dy*dy + dz*dz) + 0.1;
+    const unitX = dx / distance;
+    const unitY = dy / distance;
+    const unitZ = dz / distance;
+    const deltaInnovation = entity1.state.innovation - entity2.state.innovation;
+    const trustProduct = entity1.state.trust * entity2.state.trust;
+    const prestigeRatio = entity2.state.prestige > 0 ? (entity1.state.prestige / entity2.state.prestige - 1) : 0;
+    let Fx = deltaInnovation * pestleFactors.technological * 0.5;
+    let Fy = trustProduct * pestleFactors.social * 0.3;
+    let Fz = prestigeRatio * pestleFactors.political * 0.4;
+    const wantsNeeds = (entity1.state.wants * entity2.state.needs + entity1.state.needs * entity2.state.wants) * 0.1;
+    Fx += wantsNeeds * unitX;
+    Fy += wantsNeeds * unitY;
+    Fz += wantsNeeds * unitZ;
+    const economicScale = pestleFactors.economic;
+    const mlInfluence = (entity1.mlState.neuralActivation + entity2.mlState.neuralActivation) * 0.05;
+    return {
+      x: (Fx * economicScale) + (mlInfluence * unitX),
+      y: (Fy * economicScale) + (mlInfluence * unitY),
+      z: (Fz * economicScale) + (mlInfluence * unitZ)
+    };
+  }, []);
+
+  const calculateMaxwellForce = useCallback((entity1, entity2, pestleFactors) => {
+    const dx = entity2.position.x - entity1.position.x;
+    const dy = entity2.position.y - entity1.position.y;
+    const dz = entity2.position.z - entity1.position.z;
+    const distance = Math.sqrt(dx*dx + dy*dy + dz*dz) + 1.0;
+    const unitX = dx / distance;
+    const unitY = dy / distance;
+    const unitZ = dz / distance;
+    const q1 = entity1.charge;
+    const q2 = entity2.charge;
+    const electricForce = -q1 * q2 * 5.0 / (distance * distance);
+    const Ex = electricForce * unitX;
+    const Ey = electricForce * unitY;
+    const Ez = electricForce * unitZ;
+    const Bx = (entity2.velocity.y * unitZ - entity2.velocity.z * unitY) / (distance * distance);
+    const By = (entity2.velocity.z * unitX - entity2.velocity.x * unitZ) / (distance * distance);
+    const Bz = (entity2.velocity.x * unitY - entity2.velocity.y * unitX) / (distance * distance);
+    const lorentzScale = 10.0;
+    const lorentzX = q1 * (entity1.velocity.y * Bz - entity1.velocity.z * By) * lorentzScale;
+    const lorentzY = q1 * (entity1.velocity.z * Bx - entity1.velocity.x * Bz) * lorentzScale;
+    const lorentzZ = q1 * (entity1.velocity.x * By - entity1.velocity.y * Bx) * lorentzScale;
+    const scale = pestleFactors.technological * pestleFactors.economic;
+    const quantumInfluence = entity1.mlState.quantumEntanglement * entity2.mlState.quantumEntanglement * 0.1;
+    return {
+      x: (Ex + lorentzX) * scale + quantumInfluence * unitX,
+      y: (Ey + lorentzY) * scale + quantumInfluence * unitY,
+      z: (Ez + lorentzZ) * scale + quantumInfluence * unitZ
+    };
+  }, []);
+
+  const calculateSpringForce = useCallback((entity1, entity2, pestleFactors) => {
+    if (!entity1.connections.includes(entity2.id)) {
+      return { x: 0, y: 0, z: 0 };
+    }
+    const dx = entity2.position.x - entity1.position.x;
+    const dy = entity2.position.y - entity1.position.y;
+    const dz = entity2.position.z - entity1.position.z;
+    const distance = Math.sqrt(dx*dx + dy*dy + dz*dz) + 0.1;
+    const k = 0.05 * entity1.state.trust * entity2.state.trust * pestleFactors.social;
+    const restLength = 15;
+    const force = k * (distance - restLength);
+    const unitX = dx / distance;
+    const unitY = dy / distance;
+    const unitZ = dz / distance;
+    const bayesianInfluence = (entity1.mlState.bayesianBelief + entity2.mlState.bayesianBelief) * 0.02;
+    return {
+      x: force * unitX + bayesianInfluence * unitX,
+      y: force * unitY + bayesianInfluence * unitY,
+      z: force * unitZ + bayesianInfluence * unitZ
+    };
+  }, []);
+
+  const calculateOrbitalForce = useCallback((entity1, entity2) => {
+    const dx = entity2.position.x - entity1.position.x;
+    const dy = entity2.position.y - entity1.position.y;
+    const dz = entity2.position.z - entity1.position.z;
+    const distance = Math.sqrt(dx*dx + dy*dy + dz*dz) + 1.0;
+    const G = 2.0;
+    const force = G * entity1.state.innovation * entity2.state.prestige / (distance * distance);
+    const unitX = dx / distance;
+    const unitY = dy / distance;
+    const unitZ = dz / distance;
+    return {
+      x: force * unitX,
+      y: force * unitY,
+      z: force * unitZ
+    };
+  }, []);
+
+  const calculateFluidDrag = useCallback((entity, pestleFactors) => {
+    const scale = 0.1 * pestleFactors.environmental;
+    return {
+      x: -scale * entity.velocity.x,
+      y: -scale * entity.velocity.y,
+      z: -scale * entity.velocity.z
+    };
+  }, []);
+
+  const calculateVortexForce = useCallback((entity, pestleFactors) => {
+    const scale = pestleFactors.social * pestleFactors.political * 0.1;
+    return {
+      x: -entity.position.z * scale,
+      y: 0,
+      z: entity.position.x * scale
+    };
+  }, []);
+
+  const calculateCenterAttraction = useCallback((entity, pestleFactors) => {
+    const scale = 0.2 * entity.mass * pestleFactors.legal;
+    return {
+      x: -scale * entity.position.x,
+      y: -scale * entity.position.y,
+      z: -scale * entity.position.z
+    };
+  }, []);
+
+  const evolveEntityState = useCallback((entity, deltaTime, pestleFactors, allEntities) => {
+    const newState = { ...entity.state };
+    const newMLState = { ...entity.mlState };
+    let averageConnectionTrust = 0.5;
+    if (entity.connections.length > 0) {
+      const trustValues = entity.connections
+        .map(id => allEntities.find(e => e.id === id)?.state?.trust || 0.5)
+        .filter(trust => trust !== undefined);
+      if (trustValues.length > 0) {
+        averageConnectionTrust = trustValues.reduce((sum, trust) => sum + trust, 0) / trustValues.length;
+      }
+    }
+    const innovationForce = (entity.activity - 0.5) * pestleFactors.technological * 0.1;
+    newState.innovation += innovationForce * deltaTime;
+    const trustForce = (averageConnectionTrust - newState.trust) * pestleFactors.social * 0.05;
+    newState.trust += trustForce * deltaTime;
+    const prestigeTarget = Math.log(entity.marketCap / 1e9) / 10;
+    const prestigeForce = (prestigeTarget - newState.prestige) * pestleFactors.political * 0.03;
+    newState.prestige += prestigeForce * deltaTime;
+    const economicPressure = (pestleFactors.economic - 0.5) * 0.02;
+    newState.wants += economicPressure * deltaTime;
+    const environmentalPressure = (pestleFactors.environmental - 0.5) * 0.02;
+    newState.needs += environmentalPressure * deltaTime;
+    const stateValues = [newState.innovation, newState.trust, newState.prestige, newState.wants, newState.needs];
+    const mean = stateValues.reduce((sum, val) => sum + val, 0) / stateValues.length;
+    const variance = stateValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / stateValues.length;
+    const coherenceForce = ((1 - variance) - newState.coherence) * pestleFactors.legal * 0.02;
+    newState.coherence += coherenceForce * deltaTime;
+    newMLState.neuralActivation += (newState.innovation - newMLState.neuralActivation) * 0.1 * deltaTime;
+    newMLState.bayesianBelief += (newState.trust - newMLState.bayesianBelief) * 0.05 * deltaTime;
+    newMLState.confidence = (newState.innovation + newState.trust + newState.coherence) / 3;
+    const entanglementDecay = entity.connections.length > 0 ? 0.95 : 0.9;
+    newMLState.quantumEntanglement *= entanglementDecay;
+    entity.connections.forEach(connId => {
+      const connectedEntity = allEntities.find(e => e.id === connId);
+      if (connectedEntity && connectedEntity.state) {
+        const compatibility = newState.trust * connectedEntity.state.trust;
+        if (compatibility > 0.6) {
+          newMLState.quantumEntanglement = Math.max(newMLState.quantumEntanglement, compatibility * 0.8);
+        }
+      }
+    });
+    Object.keys(newState).forEach(key => {
+      if (newState[key] > 1) {
+        newState[key] = 1 - (newState[key] - 1) * 0.1;
+      } else if (newState[key] < 0) {
+        newState[key] = -newState[key] * 0.1;
+      }
+    });
+    Object.keys(newMLState).forEach(key => {
+      if (typeof newMLState[key] === 'number') {
+        if (newMLState[key] > 1) {
+          newMLState[key] = 1 - (newMLState[key] - 1) * 0.1;
+        } else if (newMLState[key] < 0) {
+          newMLState[key] = -newMLState[key] * 0.1;
+        }
+      }
+    });
+    return { ...newState, mlState: newMLState };
+  }, []);
+
+  const capForce = useCallback((force, maxMagnitude = 1.0) => {
+    const magnitude = Math.sqrt(force.x**2 + force.y**2 + force.z**2);
+    if (magnitude > maxMagnitude) {
+      const scale = maxMagnitude / magnitude;
+      return {
+        x: force.x * scale,
+        y: force.y * scale,
+        z: force.z * scale
+      };
+    }
+    return force;
+  }, []);
+
+  const updatePhysicsSystem = useCallback((deltaTime) => {
+    setBusinessEntities(prevEntities => {
+      const updatedEntities = prevEntities.map(entity => ({ ...entity }));
+      updatedEntities.forEach(entity => {
+        entity.forces = {};
+      });
+      for (let i = 0; i < updatedEntities.length; i++) {
+        for (let j = i + 1; j < updatedEntities.length; j++) {
+          const entity1 = updatedEntities[i];
+          const entity2 = updatedEntities[j];
+          const matrixForce = capForce(calculateMatrixForce(entity1, entity2, pestleFactors), 0.5);
+          const maxwellForce = capForce(calculateMaxwellForce(entity1, entity2, pestleFactors), 0.3);
+          const springForce = capForce(calculateSpringForce(entity1, entity2, pestleFactors), 0.8);
+          const orbitalForce = capForce(calculateOrbitalForce(entity1, entity2), 0.2);
+          const totalForce1 = {
+            x: matrixForce.x + maxwellForce.x + springForce.x + orbitalForce.x,
+            y: matrixForce.y + maxwellForce.y + springForce.y + orbitalForce.y,
+            z: matrixForce.z + maxwellForce.z + springForce.z + orbitalForce.z
+          };
+          const totalForce2 = {
+            x: -totalForce1.x,
+            y: -totalForce1.y,
+            z: -totalForce1.z
+          };
+          if (!entity1.forces.pairwise) entity1.forces.pairwise = { x: 0, y: 0, z: 0 };
+          if (!entity2.forces.pairwise) entity2.forces.pairwise = { x: 0, y: 0, z: 0 };
+          entity1.forces.pairwise.x += totalForce1.x;
+          entity1.forces.pairwise.y += totalForce1.y;
+          entity1.forces.pairwise.z += totalForce1.z;
+          entity2.forces.pairwise.x += totalForce2.x;
+          entity2.forces.pairwise.y += totalForce2.y;
+          entity2.forces.pairwise.z += totalForce2.z;
+        }
+      }
+      updatedEntities.forEach(entity => {
+        const fluidDrag = calculateFluidDrag(entity, pestleFactors);
+        const vortexForce = calculateVortexForce(entity, pestleFactors);
+        const centerAttraction = calculateCenterAttraction(entity, pestleFactors);
+        const totalForce = {
+          x: (entity.forces.pairwise?.x || 0) + fluidDrag.x + vortexForce.x + centerAttraction.x,
+          y: (entity.forces.pairwise?.y || 0) + fluidDrag.y + vortexForce.y + centerAttraction.y,
+          z: (entity.forces.pairwise?.z || 0) + fluidDrag.z + vortexForce.z + centerAttraction.z
+        };
+        const cappedTotalForce = capForce(totalForce, 2.0);
+        entity.acceleration = {
+          x: cappedTotalForce.x / entity.mass,
+          y: cappedTotalForce.y / entity.mass,
+          z: cappedTotalForce.z / entity.mass
+        };
+        entity.velocity.x += entity.acceleration.x * deltaTime;
+        entity.velocity.y += entity.acceleration.y * deltaTime;
+        entity.velocity.z += entity.acceleration.z * deltaTime;
+        entity.velocity.x *= 0.995;
+        entity.velocity.y *= 0.995;
+        entity.velocity.z *= 0.995;
+        entity.position.x += entity.velocity.x * deltaTime;
+        entity.position.y += entity.velocity.y * deltaTime;
+        entity.position.z += entity.velocity.z * deltaTime;
+        const boundary = 100;
+        ['x', 'y', 'z'].forEach(axis => {
+          if (Math.abs(entity.position[axis]) > boundary) {
+            const overshoot = Math.abs(entity.position[axis]) - boundary;
+            entity.position[axis] = Math.sign(entity.position[axis]) * (boundary - overshoot * 0.1);
+            entity.velocity[axis] *= -0.8;
+          }
+        });
+        const newStates = evolveEntityState(entity, deltaTime, pestleFactors, updatedEntities);
+        entity.state = newStates;
+        entity.mlState = newStates.mlState;
+        entity.charge = entity.state.innovation;
+        entity.radius = Math.sqrt(entity.marketCap / 1e10) + 2;
+      });
+      return updatedEntities;
+    });
+  }, [pestleFactors, calculateMatrixForce, calculateMaxwellForce, calculateSpringForce, 
+  calculateOrbitalForce, calculateFluidDrag, calculateVortexForce, 
+  calculateCenterAttraction, evolveEntityState, capForce]);
+
+  const updateSimulation = useCallback(() => {
+    const deltaTime = 0.1;
+    updatePhysicsSystem(deltaTime);
+    setPestleFactors(prev => {
+      const pestle = { ...prev };
+      const threshold = 0.1;
+      if (Math.abs(matrix6D.coherence - 0.5) > threshold) {
+        pestle.political += (matrix6D.coherence - 0.5) * 0.005;
+      }
+      if (Math.abs(matrix6D.wants - 0.5) > threshold) {
+        pestle.economic += (matrix6D.wants - 0.5) * 0.003;
+      }
+      if (Math.abs(matrix6D.trust - 0.5) > threshold) {
+        pestle.social += (matrix6D.trust - 0.5) * 0.004;
+      }
+      if (Math.abs(matrix6D.innovation - 0.5) > threshold) {
+        pestle.technological += (matrix6D.innovation - 0.5) * 0.002;
+      }
+      if (Math.abs(matrix6D.coherence - 0.5) > threshold) {
+        pestle.legal += (matrix6D.coherence - 0.5) * 0.006;
+      }
+      if (Math.abs(matrix6D.needs - 0.5) > threshold) {
+        pestle.environmental += (matrix6D.needs - 0.5) * 0.008;
+      }
+      Object.keys(pestle).forEach(key => {
+        if (pestle[key] > 1) {
+          pestle[key] = 1 - (pestle[key] - 1) * 0.5;
+        } else if (pestle[key] < 0) {
+          pestle[key] = -pestle[key] * 0.5;
+        }
+      });
+      return pestle;
+    });
+    setMatrix6D(prev => {
+      const avgInnovation = businessEntities.reduce((sum, e) => sum + e.state.innovation, 0) / businessEntities.length;
+      const avgTrust = businessEntities.reduce((sum, e) => sum + e.state.trust, 0) / businessEntities.length;
+      const avgPrestige = businessEntities.reduce((sum, e) => sum + e.state.prestige, 0) / businessEntities.length;
+      const avgWants = businessEntities.reduce((sum, e) => sum + e.state.wants, 0) / businessEntities.length;
+      const avgNeeds = businessEntities.reduce((sum, e) => sum + e.state.needs, 0) / businessEntities.length;
+      const avgCoherence = businessEntities.reduce((sum, e) => sum + e.state.coherence, 0) / businessEntities.length;
+      return {
+        innovation: prev.innovation + (avgInnovation - prev.innovation) * 0.1,
+        trust: prev.trust + (avgTrust - prev.trust) * 0.1,
+        prestige: prev.prestige + (avgPrestige - prev.prestige) * 0.1,
+        wants: prev.wants + (avgWants - prev.wants) * 0.1,
+        needs: prev.needs + (avgNeeds - prev.needs) * 0.1,
+        coherence: prev.coherence + (avgCoherence - prev.coherence) * 0.1
+      };
+    });
+    const aggregatedForces = businessEntities.reduce((totals, entity) => {
+      const velocity = Math.sqrt(entity.velocity.x**2 + entity.velocity.y**2 + entity.velocity.z**2);
+      return {
+        matrixForce: totals.matrixForce + (entity.forces.pairwise?.x || 0),
+        maxwellForce: totals.maxwellForce + (entity.forces.pairwise?.y || 0),
+        springForce: totals.springForce + (entity.connections.length * 0.1),
+        orbitalForce: totals.orbitalForce + (entity.state.innovation * entity.state.prestige * 0.1),
+        fluidForce: totals.fluidForce + velocity * 0.1,
+        vortexForce: totals.vortexForce + (entity.position.x * entity.position.z * 0.001),
+        centerForce: totals.centerForce + (Math.sqrt(entity.position.x**2 + entity.position.y**2 + entity.position.z**2) * 0.01),
+        tensorForce: totals.tensorForce + (v24State.tensorOps / 100000),
+        mlForce: totals.mlForce + (entity.mlState.neuralActivation * entity.mlState.confidence * 0.1)
+      };
+    }, {
+      matrixForce: 0, maxwellForce: 0, springForce: 0, orbitalForce: 0,
+      fluidForce: 0, vortexForce: 0, centerForce: 0, tensorForce: 0, mlForce: 0
+    });
+    const newForceData = {
+      time: currentTime,
+      ...aggregatedForces
+    };
+    setForceData(prev => [...prev.slice(-49), newForceData]);
+    const newNetworkData = businessEntities.map(entity => ({
+      id: entity.id,
+      name: entity.name,
+      x: (entity.position.x + 100) * 0.5,
+      y: (entity.position.y + 100) * 0.5,
+      z: (entity.position.z + 100) * 0.5,
+      size: Math.log(entity.marketCap / 1e9) * 4 + 12,
+      color: getEntityColor(entity.type),
+      influence: entity.influence,
+      velocity: Math.sqrt(entity.velocity.x**2 + entity.velocity.y**2 + entity.velocity.z**2),
+      state: entity.state,
+      mlState: entity.mlState
+    }));
+    setNetworkData(newNetworkData);
+    setSystemMetrics(prev => ({
+      v24Transformer: {
+        performance: Math.max(85, Math.min(99, prev.v24Transformer.performance + (matrix6D.innovation - 0.5) * 2)),
+        memoryUsage: Math.max(600, Math.min(1000, prev.v24Transformer.memoryUsage + (currentTime % 10 - 5) * 10)),
+        throughput: Math.max(2, Math.min(4, prev.v24Transformer.throughput + (pestleFactors.technological - 0.5) * 0.5))
+      },
+      gpuCompute: {
+        utilization: Math.max(75, Math.min(95, prev.gpuCompute.utilization + (v24State.gpuUtilization - 90) * 0.1)),
+        gflops: Math.max(4, Math.min(7, prev.gpuCompute.gflops + (matrix6D.coherence - 0.5) * 0.5)),
+        powerDraw: Math.max(220, Math.min(280, prev.gpuCompute.powerDraw + (currentTime % 8 - 4) * 5))
+      },
+      networkAnalyzer: {
+        nodeCount: businessEntities.length,
+        edgeCount: businessEntities.reduce((sum, e) => sum + e.connections.length, 0),
+        clusterCount: Math.max(8, Math.min(16, prev.networkAnalyzer.clusterCount + (currentTime % 6 - 3)))
+      },
+      mlEngine: {
+        accuracy: Math.max(88, Math.min(96, prev.mlEngine.accuracy + (matrix6D.trust - 0.5) * 1.5)),
+        trainingLoss: Math.max(0.015, Math.min(0.04, prev.mlEngine.trainingLoss + (0.5 - matrix6D.coherence) * 0.01)),
+        predictionConfidence: Math.max(85, Math.min(94, prev.mlEngine.predictionConfidence + (pestleFactors.technological - 0.5) * 3))
+      }
+    }));
+    if (currentTime % 10 === 0) {
+      runMLTrainingCycle();
+    }
+  }, [currentTime, pestleFactors, matrix6D, businessEntities, updatePhysicsSystem, v24State, runMLTrainingCycle]);
+
+  const getEntityColor = (type) => {
+    const colors = {
+      Enterprise: '#8B5CF6',
+      Academic: '#06B6D4', 
+      Government: '#10B981',
+      Media: '#F59E0B'
+    };
+    return colors[type] || '#6B7280';
+  };
+
+  useEffect(() => {
+    let interval;
+    if (isSimulating) {
+      interval = setInterval(() => {
+        setCurrentTime(prev => prev + 1);
+      }, 100);
+    }
+    return () => clearInterval(interval);
+  }, [isSimulating]);
+
+  // Separate effect for simulation based explicitly on currentTime
+  useEffect(() => {
+    if (isSimulating) {
+      updateSimulation();
+    }
+  }, [currentTime, isSimulating, updateSimulation]);
+
+  useEffect(() => {
+    if (hilbertCanvasRef.current) {
+      const canvas = hilbertCanvasRef.current;
+      if (!canvas) return; // Early exit if canvas is undefined
+      const ctx = canvas.getContext('2d');
+      const { width, height } = canvas;
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+      ctx.fillRect(0, 0, width, height);
+      const hilbertCurve = generateHilbertCurve(6);
+      ctx.strokeStyle = '#06B6D4';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      if (hilbertCurve.length > 0) {
+        ctx.moveTo(hilbertCurve[0].x * 4, hilbertCurve[0].y * 4);
+        for (let i = 1; i < hilbertCurve.length; i++) {
+          ctx.lineTo(hilbertCurve[i].x * 4, hilbertCurve[i].y * 4);
+        }
+      }
+      ctx.stroke();
+      businessEntities.forEach((entity, index) => {
+        const curveIndex = index % hilbertCurve.length;
+        if (hilbertCurve[curveIndex]) {
+          const x = hilbertCurve[curveIndex].x * 4;
+          const y = hilbertCurve[curveIndex].y * 4;
+          ctx.fillStyle = entity.mlState.neuralActivation > 0.5 ? '#10B981' : '#EF4444';
+          ctx.fillRect(x-2, y-2, 4, 4);
+        }
+      });
+    }
+  }, [businessEntities, generateHilbertCurve]);
+
+  useEffect(() => {
+    if (heatmapCanvasRef.current && matrix6D) {
+      const canvas = heatmapCanvasRef.current;
+      const ctx = canvas.getContext('2d');
+      const { width, height } = canvas;
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+      ctx.fillRect(0, 0, width, height);
+      for (let i = 0; i < 16; i++) {
+        for (let j = 0; j < 16; j++) {
+          const entityIndex = (i * 16 + j) % businessEntities.length;
+          const entity = businessEntities[entityIndex];
+          const value = entity ? (entity.mlState.neuralActivation + entity.mlState.bayesianBelief + entity.mlState.confidence + entity.mlState.quantumEntanglement) / 4 : 0; // Enriched: include quantum
+          const intensity = Math.abs(value);
+          const hue = value > 0.5 ? 120 : 240;
+          ctx.fillStyle = `hsla(${hue}, 70%, 50%, ${intensity * 0.7})`;
+          ctx.fillRect(i * width/16, j * height/16, width/16, height/16);
+        }
+      }
+    }
+  }, [matrix6D, businessEntities]);
+
+  // Enriched visuals: 3D visualization with three.js
+  useEffect(() => {
+    if (activeModule === 'visualization' && canvasRef.current) {
+      const canvas = canvasRef.current;
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+      renderer.setSize(canvas.clientWidth, canvas.clientHeight, false); // avoids resize loop
+      renderer.setClearColor(0x0f172a);
+
+      // Add ambient light
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      scene.add(ambientLight);
+
+      // Add directional light
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(100, 100, 100);
+      scene.add(directionalLight);
+
+      // Add entities as spheres with material for better visuals
+      const spheres = [];
+      businessEntities.forEach(entity => {
+        const geometry = new THREE.SphereGeometry(entity.radius || 3, 32, 32);
+        const material = new THREE.MeshStandardMaterial({ 
+          color: getEntityColor(entity.type),
+          emissive: entity.mlState.confidence > 0.7 ? 0x444444 : 0x000000,
+          metalness: 0.5,
+          roughness: 0.5
+        });
+        const sphere = new THREE.Mesh(geometry, material);
+        sphere.position.set(entity.position.x, entity.position.y, entity.position.z);
+        sphere.userData = entity; // For interaction
+        scene.add(sphere);
+        spheres.push(sphere);
+      });
+
+      // Add lines for connections with dashed for dynamics
+      const lines = [];
+      businessEntities.forEach(entity => {
+        entity.connections.forEach(connId => {
+          const target = businessEntities.find(e => e.id === connId);
+          if (target) {
+            const material = new THREE.LineDashedMaterial({ 
+              color: 0x06b6d4, 
+              dashSize: 3, 
+              gapSize: 1 
+            });
+            const points = [];
+            points.push(new THREE.Vector3(entity.position.x, entity.position.y, entity.position.z));
+            points.push(new THREE.Vector3(target.position.x, target.position.y, target.position.z));
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const line = new THREE.Line(geometry, material);
+            line.computeLineDistances();
+            scene.add(line);
+            lines.push(line);
+          }
+        });
+      });
+
+      camera.position.set(0, 0, 200);
+      camera.lookAt(0, 0, 0);
+
+      const animate = () => {
+        requestAnimationFrame(animate);
+        // Simple rotation for visualization
+        scene.rotation.y += 0.001;
+        renderer.render(scene, camera);
+      };
+      animate();
+
+      // Resize handler
+      const handleResize = () => {
+        camera.aspect = canvas.clientWidth / canvas.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(canvas.clientWidth, canvas.clientHeight, false); // avoids resize loop
+      };
+      window.addEventListener('resize', handleResize);
+
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        spheres.forEach(sphere => {
+          sphere.geometry.dispose();
+          sphere.material.dispose();
+          scene.remove(sphere);
+        });
+        lines.forEach(line => {
+          line.geometry.dispose();
+          line.material.dispose();
+          scene.remove(line);
+        });
+        renderer.dispose();
+      };
+    }
+  }, [activeModule, businessEntities]);
+
+  const modules = [
+    { id: 'overview', name: 'V24 Overview', icon: Activity },
+    { id: 'pestle', name: 'PESTLE Analysis', icon: TrendingUp },
+    { id: 'matrix', name: '6D Matrix', icon: GitBranch },
+    { id: 'forces', name: 'Force Fields', icon: Zap },
+    { id: 'network', name: 'Network Topology', icon: Network },
+    { id: 'ml', name: 'ML Systems', icon: Brain },
+    { id: 'gpu', name: 'GPU Compute', icon: Cpu },
+    { id: 'tensor', name: 'Tensor Processing', icon: Layers },
+    { id: 'visualization', name: '3D Visualization', icon: Eye }
+  ];
+
+  const V24Overview = () => (
+    <div className="space-y-6">
+      <div className="bg-gradient-to-br from-slate-800/80 to-purple-900/40 backdrop-blur-md border border-cyan-500/50 rounded-xl p-6 shadow-2xl">
+        <h2 className="text-2xl font-bold mb-4 flex items-center gap-3 bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+          <Activity className="w-6 h-6 text-cyan-400" />
+          V24 ADVANCED ML PESTLE-MAXWELL SYSTEM
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <button
+            onClick={() => setIsSimulating(!isSimulating)}
+            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all shadow-lg ${
+              isSimulating 
+              ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white' 
+              : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white'
+            }`}
+          >
+            {isSimulating ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            {isSimulating ? 'Pause' : 'Start'} V24
+          </button>
+          <button
+            onClick={() => {
+              setCurrentTime(0);
+              setForceData([]);
+              setNetworkData([]);
+              setMLPredictions(null);
+            }}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 rounded-lg font-semibold transition-all text-white shadow-lg"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Reset System
+          </button>
+          <button
+            onClick={runAdvancedMLAnalysis}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 rounded-lg font-semibold transition-all text-white shadow-lg"
+          >
+            <Brain className="w-4 h-4" />
+            Tensor Analysis
+          </button>
+          <button
+            onClick={toggleNeuralNetworkTraining}
+            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all text-white shadow-lg ${
+              mlConfig.neuralNetwork.isTraining
+              ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800'
+              : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
+            }`}
+          >
+            <Database className="w-4 h-4" />
+            {mlConfig.neuralNetwork.isTraining ? 'Stop NN' : 'Train NN'}
+          </button>
+        </div>
+        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+          <div className="bg-slate-900/50 p-3 rounded-lg">
+            <div className="text-3xl font-mono text-cyan-400">Time: {currentTime}</div>
+            <div className="text-sm text-gray-400">Simulation Steps</div>
+          </div>
+          <div className="bg-slate-900/50 p-3 rounded-lg">
+            <div className="text-3xl font-mono text-green-400">{businessEntities.length}</div>
+            <div className="text-sm text-gray-400">ML Entities</div>
+          </div>
+          <div className="bg-slate-900/50 p-3 rounded-lg">
+            <div className="text-3xl font-mono text-purple-400">{businessEntities.reduce((sum, e) => sum + e.connections.length, 0)}</div>
+            <div className="text-sm text-gray-400">Neural Connections</div>
+          </div>
+          <div className="bg-slate-900/50 p-3 rounded-lg">
+            <div className="text-3xl font-mono text-orange-400">{(businessEntities.length * (businessEntities.length - 1) / 2)}</div>
+            <div className="text-sm text-gray-400">Force Pairs</div>
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {Object.entries(systemMetrics).map(([key, metrics]) => (
+          <div key={key} className="bg-slate-800/50 backdrop-blur-md border border-cyan-500/30 rounded-xl p-6 shadow-lg">
+            <h3 className="text-lg font-semibold mb-3 text-cyan-400 capitalize">
+              {key.replace(/([A-Z])/g, ' $1').trim()}
+            </h3>
+            <div className="space-y-3">
+              {Object.entries(metrics).map(([metricKey, value]) => (
+                <div key={metricKey} className="flex justify-between">
+                  <span className="capitalize">{metricKey.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                  <span className="font-mono text-cyan-400">
+                    {typeof value === 'number' ? value.toFixed(1) : value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6 shadow-lg">
+        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <GitBranch className="w-5 h-5 text-cyan-400" />
+          6D State Vector Evolution with ML Integration
+        </h3>
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+          {Object.entries(matrix6D).map(([key, value]) => (
+            <div key={key} className="text-center">
+              <div className="text-2xl font-mono text-cyan-400 mb-1">{value.toFixed(3)}</div>
+              <div className="text-sm text-gray-400 capitalize">{key}</div>
+              <div className="w-full bg-slate-700 rounded-full h-2 mt-2">
+                <div 
+                  className="bg-gradient-to-r from-purple-500 to-cyan-500 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${value * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6 shadow-lg">
+        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Zap className="w-5 h-5 text-cyan-400" />
+          Advanced Force Evolution with ML Forces
+        </h3>
+        <ResponsiveContainer width="100%" height={350}>
+          <LineChart data={forceData.slice(-50)}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <XAxis dataKey="time" stroke="#9CA3AF" />
+            <YAxis stroke="#9CA3AF" />
+            <Tooltip 
+              contentStyle={{ 
+                backgroundColor: '#1F2937', 
+                border: '1px solid #374151',
+                borderRadius: '8px'
+              }} 
+            />
+            <Legend />
+            <Line type="monotone" dataKey="matrixForce" stroke="#06B6D4" strokeWidth={2} dot={false} name="Matrix (PESTLE)" />
+            <Line type="monotone" dataKey="maxwellForce" stroke="#3B82F6" strokeWidth={2} dot={false} name="Maxwell (EM)" />
+            <Line type="monotone" dataKey="orbitalForce" stroke="#F59E0B" strokeWidth={2} dot={false} name="Orbital" />
+            <Line type="monotone" dataKey="springForce" stroke="#10B981" strokeWidth={2} dot={false} name="Spring" />
+            <Line type="monotone" dataKey="tensorForce" stroke="#8B5CF6" strokeWidth={2} dot={false} name="V24-Tensor" />
+            <Line type="monotone" dataKey="mlForce" stroke="#EF4444" strokeWidth={3} dot={false} name="ML Neural" />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6 shadow-lg">
+        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Brain className="w-5 h-5 text-cyan-400" />
+          ML System Status
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-slate-900/50 p-3 rounded-lg text-center">
+            <div className="text-2xl font-mono text-green-400">{(mlSystem.neuralNetwork.accuracy * 100).toFixed(1)}%</div>
+            <div className="text-sm text-gray-400">Neural Network</div>
+          </div>
+          <div className="bg-slate-900/50 p-3 rounded-lg text-center">
+            <div className="text-2xl font-mono text-purple-400">{(mlSystem.xorNetwork.accuracy * 100).toFixed(1)}%</div>
+            <div className="text-sm text-gray-400">XOR Network</div>
+          </div>
+          <div className="bg-slate-900/50 p-3 rounded-lg text-center">
+            <div className="text-2xl font-mono text-orange-400">{mlSystem.bayesianNetwork.beliefs.filter(b => b > 0.5).length}</div>
+            <div className="text-sm text-gray-400">Bayesian Nodes</div>
+          </div>
+          <div className="bg-slate-900/50 p-3 rounded-lg text-center">
+            <div className="text-2xl font-mono text-cyan-400">{mlSystem.quantumSystem.entanglements.size}</div>
+            <div className="text-sm text-gray-400">Entanglements</div>
+          </div>
+        </div>
+      </div>
+      <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6 shadow-lg">
+        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Activity className="w-5 h-5 text-cyan-400" />
+          System Status
+        </h3>
+        <div className="space-y-2 max-h-64 overflow-y-auto">
+          {systemAlerts.slice(0, 10).map((alert, index) => (
+            <div key={index} className={`text-sm p-3 rounded-lg flex items-center gap-3 ${
+              alert.type === 'error' ? 'bg-red-500/20 border-l-4 border-l-red-500' :
+              alert.type === 'warning' ? 'bg-yellow-500/20 border-l-4 border-l-yellow-500' :
+              alert.type === 'success' ? 'bg-green-500/20 border-l-4 border-l-green-500' :
+              'bg-blue-500/20 border-l-4 border-l-blue-500'
+            }`}>
+              <span className="text-lg">
+                {alert.type === 'error' ? '🔴' : 
+                alert.type === 'warning' ? '⚠️' : 
+                alert.type === 'success' ? '✅' : 'ℹ️'}
+              </span>
+              <div className="flex-1">
+                <div className="font-medium">{alert.message}</div>
+                <div className="text-xs text-gray-400 mt-1">{alert.timestamp}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderMLModule = () => (
+    <div className="space-y-6">
+      <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6">
+        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Brain className="w-5 h-5 text-cyan-400" />
+          Advanced ML Systems Control Panel
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <button
+            onClick={toggleNeuralNetworkTraining}
+            className={`px-4 py-3 rounded-lg font-semibold transition-all text-white shadow-lg ${
+              mlConfig.neuralNetwork.isTraining
+              ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800'
+              : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800'
+            }`}
+          >
+            🧠 {mlConfig.neuralNetwork.isTraining ? 'Stop' : 'Train'} Neural Net
+          </button>
+          <button
+            onClick={toggleXORNetworkTraining}
+            className={`px-4 py-3 rounded-lg font-semibold transition-all text-white shadow-lg ${
+              mlConfig.xorNetwork.isTraining
+              ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800'
+              : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800'
+            }`}
+          >
+            🔄 {mlConfig.xorNetwork.isTraining ? 'Stop' : 'Train'} XOR
+          </button>
+          <button
+            onClick={toggleQLearningTraining}
+            className={`px-4 py-3 rounded-lg font-semibold transition-all text-white shadow-lg ${
+              mlConfig.qLearning.isTraining
+              ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800'
+              : 'bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800'
+            }`}
+          >
+            🎯 {mlConfig.qLearning.isTraining ? 'Stop' : 'Train'} Q-Learning
+          </button>
+          <button
+            onClick={updateBayesianNetwork}
+            className="px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 rounded-lg font-semibold transition-all text-white shadow-lg"
+          >
+            📊 Update Bayesian
+          </button>
+          <button
+            onClick={updateQuantumSystem}
+            className="px-4 py-3 bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 rounded-lg font-semibold transition-all text-white shadow-lg"
+          >
+            ⚛️ Quantum Update
+          </button>
+        </div>
+
+        <div className="bg-slate-900/50 p-4 rounded-lg mb-6">
+          <h4 className="font-semibold text-cyan-400 mb-3">ML Configuration</h4>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">NN Learning Rate</label>
+              <input
+                type="range"
+                min="0.001"
+                max="0.1"
+                step="0.001"
+                value={mlConfig.neuralNetwork.learningRate}
+                onChange={(e) => setMLConfig(prev => ({
+                  ...prev,
+                  neuralNetwork: { ...prev.neuralNetwork, learningRate: parseFloat(e.target.value) }
+                }))}
+                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+              />
+              <div className="text-right text-sm font-mono text-cyan-400">{mlConfig.neuralNetwork.learningRate.toFixed(3)}</div>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">XOR Learning Rate</label>
+              <input
+                type="range"
+                min="0.1"
+                max="2.0"
+                step="0.1"
+                value={mlConfig.xorNetwork.learningRate}
+                onChange={(e) => setMLConfig(prev => ({
+                  ...prev,
+                  xorNetwork: { ...prev.xorNetwork, learningRate: parseFloat(e.target.value) }
+                }))}
+                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+              />
+              <div className="text-right text-sm font-mono text-cyan-400">{mlConfig.xorNetwork.learningRate.toFixed(1)}</div>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">QL Alpha</label>
+              <input
+                type="range"
+                min="0.01"
+                max="0.5"
+                step="0.01"
+                value={mlConfig.qLearning.alpha}
+                onChange={(e) => setMLConfig(prev => ({
+                  ...prev,
+                  qLearning: { ...prev.qLearning, alpha: parseFloat(e.target.value) }
+                }))}
+                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+              />
+              <div className="text-right text-sm font-mono text-cyan-400">{mlConfig.qLearning.alpha.toFixed(2)}</div>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Quantum Coherence Decay</label>
+              <input
+                type="range"
+                min="0.9"
+                max="0.999"
+                step="0.001"
+                value={mlConfig.quantum.coherenceDecay}
+                onChange={(e) => setMLConfig(prev => ({
+                  ...prev,
+                  quantum: { ...prev.quantum, coherenceDecay: parseFloat(e.target.value) }
+                }))}
+                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+              />
+              <div className="text-right text-sm font-mono text-cyan-400">{mlConfig.quantum.coherenceDecay.toFixed(3)}</div>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Entanglement Threshold</label>
+              <input
+                type="range"
+                min="0.1"
+                max="0.9"
+                step="0.05"
+                value={mlConfig.quantum.entanglementThreshold}
+                onChange={(e) => setMLConfig(prev => ({
+                  ...prev,
+                  quantum: { ...prev.quantum, entanglementThreshold: parseFloat(e.target.value) }
+                }))}
+                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+              />
+              <div className="text-right text-sm font-mono text-cyan-400">{mlConfig.quantum.entanglementThreshold.toFixed(2)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="bg-slate-900/50 p-4 rounded-lg">
+            <h4 className="font-semibold text-cyan-400 mb-3">Neural Network</h4>
+            <div className="space-y-2 text-sm">
+              <div>Status: <span className={mlConfig.neuralNetwork.isTraining ? "text-green-400" : "text-gray-400"}>{mlConfig.neuralNetwork.isTraining ? 'Training' : 'Idle'}</span></div>
+              <div>Accuracy: <span className="text-green-400">{(mlSystem.neuralNetwork.accuracy * 100).toFixed(1)}%</span></div>
+              <div>Epochs: <span className="text-purple-400">{mlSystem.neuralNetwork.epochs}</span></div>
+              <div>Loss: <span className="text-orange-400">{mlSystem.neuralNetwork.loss.toFixed(4)}</span></div>
+            </div>
+          </div>
+          <div className="bg-slate-900/50 p-4 rounded-lg">
+            <h4 className="font-semibold text-purple-400 mb-3">XOR Network</h4>
+            <div className="space-y-2 text-sm">
+              <div>Status: <span className={mlConfig.xorNetwork.isTraining ? "text-green-400" : "text-gray-400"}>{mlConfig.xorNetwork.isTraining ? 'Training' : 'Idle'}</span></div>
+              <div>Accuracy: <span className="text-green-400">{(mlSystem.xorNetwork.accuracy * 100).toFixed(1)}%</span></div>
+              <div>Epochs: <span className="text-purple-400">{mlSystem.xorNetwork.epoch}</span></div>
+              <div>Loss: <span className="text-orange-400">{mlSystem.xorNetwork.loss.toFixed(4)}</span></div>
+            </div>
+          </div>
+          <div className="bg-slate-900/50 p-4 rounded-lg">
+            <h4 className="font-semibold text-orange-400 mb-3">Q-Learning</h4>
+            <div className="space-y-2 text-sm">
+              <div>Status: <span className={mlConfig.qLearning.isTraining ? "text-green-400" : "text-gray-400"}>{mlConfig.qLearning.isTraining ? 'Training' : 'Idle'}</span></div>
+              <div>States: <span className="text-green-400">{mlSystem.qLearning.qTable.size}</span></div>
+              <div>Epsilon: <span className="text-purple-400">{mlConfig.qLearning.epsilon.toFixed(2)}</span></div>
+            </div>
+          </div>
+          <div className="bg-slate-900/50 p-4 rounded-lg">
+            <h4 className="font-semibold text-blue-400 mb-3">Bayesian Network</h4>
+            <div className="space-y-2 text-sm">
+              <div>Active Nodes: <span className="text-green-400">{mlSystem.bayesianNetwork.nodes.length}</span></div>
+              <div>High Belief: <span className="text-purple-400">{mlSystem.bayesianNetwork.beliefs.filter(b => b > 0.7).length}</span></div>
+              <div>Avg Belief: <span className="text-orange-400">{mlSystem.bayesianNetwork.beliefs.length > 0 ? (mlSystem.bayesianNetwork.beliefs.reduce((sum, b) => sum + b, 0) / mlSystem.bayesianNetwork.beliefs.length).toFixed(3) : '0.000'}</span></div>
+              <div>Structure: <span className="text-cyan-400">{mlSystem.bayesianNetwork.structure.size} edges</span></div>
+            </div>
+          </div>
+          <div className="bg-slate-900/50 p-4 rounded-lg">
+            <h4 className="font-semibold text-cyan-400 mb-3">Quantum System</h4>
+            <div className="space-y-2 text-sm">
+              <div>Qubits: <span className="text-green-400">{mlSystem.quantumSystem.qubits.length}</span></div>
+              <div>Entangled: <span className="text-purple-400">{mlSystem.quantumSystem.entanglements.size}</span></div>
+              <div>Coherence: <span className="text-orange-400">{mlSystem.quantumSystem.coherence.toFixed(3)}</span></div>
+              <div>Superposition: <span className="text-cyan-400">{mlSystem.quantumSystem.qubits.filter(q => q.superposition).length}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {mlPredictions && (
+        <>
+          <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6">
+            <h3 className="text-xl font-semibold mb-4 text-green-400">Advanced ML Predictions</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-slate-900/50 p-4 rounded-lg">
+                <h4 className="font-semibold text-cyan-400 mb-3">Next Step Prediction</h4>
+                <div className="space-y-2 text-sm">
+                  <div>Innovation: <span className="text-green-400">{mlPredictions.nextStepPrediction.innovation.toFixed(3)}</span></div>
+                  <div>Trust: <span className="text-blue-400">{mlPredictions.nextStepPrediction.trust.toFixed(3)}</span></div>
+                  <div>Market Stability: <span className="text-purple-400">{mlPredictions.nextStepPrediction.marketStability.toFixed(3)}</span></div>
+                  <div>Risk Factor: <span className="text-orange-400">{mlPredictions.nextStepPrediction.riskFactor.toFixed(3)}</span></div>
+                </div>
+              </div>
+              <div className="bg-slate-900/50 p-4 rounded-lg">
+                <h4 className="font-semibold text-purple-400 mb-3">Force Field Analysis</h4>
+                <div className="space-y-2 text-sm">
+                  <div>Dominant: <span className="text-cyan-400">{mlPredictions.forceFieldAnalysis.dominant_force}</span></div>
+                  <div>Stability: <span className="text-green-400">{mlPredictions.forceFieldAnalysis.stability.toFixed(3)}</span></div>
+                  <div>Coherence: <span className="text-blue-400">{mlPredictions.forceFieldAnalysis.coherence.toFixed(3)}</span></div>
+                  <div>Confidence: <span className="text-orange-400">{(mlPredictions.forceFieldAnalysis.confidence * 100).toFixed(1)}%</span></div>
+                </div>
+              </div>
+              <div className="bg-slate-900/50 p-4 rounded-lg">
+                <h4 className="font-semibold text-green-400 mb-3">Bayesian Inference</h4>
+                <div className="space-y-2 text-sm">
+                  {Object.entries(mlPredictions.bayesianPredictions).map(([key, value]) => (
+                    <div key={key}>
+                      {key.charAt(0).toUpperCase() + key.slice(1)}: <span className="text-cyan-400">{value.toFixed(3)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6">
+            <h3 className="text-xl font-semibold mb-4 text-orange-400">Tensor Processing Insights</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <div className="text-lg font-mono text-cyan-400">{tensorState.activeTokens.toLocaleString()}</div>
+                <div className="text-sm text-gray-400">Active Tokens</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-mono text-green-400">{tensorState.hilbertOrder}</div>
+                <div className="text-sm text-gray-400">Hilbert Order</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-mono text-purple-400">{tensorState.processingNodes}</div>
+                <div className="text-sm text-gray-400">Processing Nodes</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-mono text-orange-400">{tensorState.tensorShape.join('×')}</div>
+                <div className="text-sm text-gray-400">Tensor Shape</div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+      {!mlPredictions && (
+        <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6 text-center">
+          <h3 className="text-xl font-semibold mb-4">Advanced Tensor-Transformer ML Analysis</h3>
+          <p className="text-gray-400 mb-4">
+            Run advanced analysis using 50×6×6 tensor tokenization, Hilbert curve mapping, 
+            8-layer transformer processing, and Bayesian inference.
+          </p>
+          <button
+            onClick={runAdvancedMLAnalysis}
+            className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-semibold transition-all text-white"
+          >
+            🧠 Run Advanced Tensor Analysis
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderPestleModule = () => {
+    const pestleData = useMemo(() => 
+      Object.entries(pestleFactors).map(([name, value]) => ({ name: name.toUpperCase(), value })), 
+    [pestleFactors]);
+
+    return (
+      <div className="space-y-6">
+        <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6">
+          <h3 className="text-xl font-semibold mb-4">PESTLE Factor Controls</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+            {Object.entries(pestleFactors).map(([factor, value]) => (
+              <div key={factor} className="space-y-2">
+                <label className="block text-sm font-medium capitalize">{factor}</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={value}
+                  onChange={(e) => setPestleFactors(prev => ({ ...prev, [factor]: parseFloat(e.target.value) }))}
+                  className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                />
+                <div className="text-right text-sm font-mono text-cyan-400">{value.toFixed(3)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6">
+          <h3 className="text-xl font-semibold mb-4">PESTLE Radar Chart</h3>
+          <ResponsiveContainer width="100%" height={400}>
+            <RadarChart data={pestleData}>
+              <PolarGrid stroke="#374151" />
+              <PolarAngleAxis dataKey="name" tick={{ fill: '#9CA3AF', fontSize: 12 }} />
+              <PolarRadiusAxis angle={0} domain={[0, 1]} tick={{ fill: '#9CA3AF', fontSize: 10 }} />
+              <Radar
+                name="PESTLE Factors"
+                dataKey="value"
+                stroke="#8B5CF6"
+                fill="#8B5CF6"
+                fillOpacity={0.3}
+              />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    );
+  };
+
+  const CustomScatterShape = (props) => {
+    const { cx, cy, payload } = props;
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={payload.size / 2 || 5}
+        fill={payload.color || '#8B5CF6'}
+        stroke="#fff"
+        strokeWidth={1}
+      />
+    );
+  };
+
+  const renderNetworkModule = () => (
+    <div className="space-y-6">
+      <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6">
+        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Network className="w-5 h-5 text-cyan-400" />
+          Business Entity Network with ML States
+        </h3>
+        <ResponsiveContainer width="100%" height={400}>
+          <ScatterChart>
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <XAxis type="number" dataKey="x" domain={[0, 100]} stroke="#9CA3AF" />
+            <YAxis type="number" dataKey="y" domain={[0, 100]} stroke="#9CA3AF" />
+            <Tooltip 
+              content={({ payload }) => {
+                if (payload && payload[0]) {
+                  const data = payload[0].payload;
+                  return (
+                    <div className="bg-slate-800 border border-slate-600 p-3 rounded-lg">
+                      <div className="font-semibold text-cyan-400">{data.name}</div>
+                      <div>Position: ({data.x.toFixed(1)}, {data.y.toFixed(1)})</div>
+                      <div>Velocity: {data.velocity.toFixed(3)}</div>
+                      <div>ML Activation: {data.mlState?.neuralActivation?.toFixed(3) || 'N/A'}</div>
+                      <div>Quantum Entanglement: {data.mlState?.quantumEntanglement?.toFixed(3) || 'N/A'}</div>
+                    </div>
+                  );
+                }
+                return null;
+              }}
+            />
+            <Scatter 
+              data={networkData} 
+              shape={CustomScatterShape}
+            />
+          </ScatterChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+        {businessEntities.slice(0, 12).map(entity => {
+          const velocity = Math.sqrt(entity.velocity.x**2 + entity.velocity.y**2 + entity.velocity.z**2);
+          return (
+            <div key={entity.id} className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-4 shadow-lg">
+              <h4 className="font-semibold mb-2 text-cyan-400">{entity.name}</h4>
+              <div className="text-xs space-y-1">
+                <div>Type: <span className="text-cyan-400">{entity.type}</span></div>
+                <div>Sector: <span className="text-green-400">{entity.sector}</span></div>
+                <div>Market Cap: <span className="text-purple-400">${(entity.marketCap / 1e9).toFixed(1)}B</span></div>
+                <div>Velocity: <span className="text-orange-400">{velocity.toFixed(3)}</span></div>
+                <div className="border-t border-slate-600 pt-2 mt-2">
+                  <div className="text-cyan-400 font-semibold mb-1">6D State:</div>
+                  <div className="grid grid-cols-3 gap-1 text-xs">
+                    <div>I: {entity.state.innovation.toFixed(2)}</div>
+                    <div>T: {entity.state.trust.toFixed(2)}</div>
+                    <div>P: {entity.state.prestige.toFixed(2)}</div>
+                    <div>W: {entity.state.wants.toFixed(2)}</div>
+                    <div>N: {entity.state.needs.toFixed(2)}</div>
+                    <div>C: {entity.state.coherence.toFixed(2)}</div>
+                  </div>
+                </div>
+                <div className="border-t border-slate-600 pt-2 mt-2">
+                  <div className="text-purple-400 font-semibold mb-1">ML State:</div>
+                  <div className="grid grid-cols-2 gap-1 text-xs">
+                    <div>Neural: {entity.mlState.neuralActivation.toFixed(2)}</div>
+                    <div>Bayesian: {entity.mlState.bayesianBelief.toFixed(2)}</div>
+                    <div>Quantum: {entity.mlState.quantumEntanglement.toFixed(2)}</div>
+                    <div>Confidence: {entity.mlState.confidence.toFixed(2)}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const renderTensorModule = () => (
+    <div className="space-y-6">
+      <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6">
+        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Layers className="w-5 h-5 text-cyan-400" />
+          Advanced Tensor Processing System with ML
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="text-center bg-slate-900/50 p-3 rounded-lg">
+            <div className="text-2xl font-mono text-purple-400">{tensorState.activeTokens.toLocaleString()}</div>
+            <div className="text-sm text-gray-400">Active Tokens</div>
+          </div>
+          <div className="text-center bg-slate-900/50 p-3 rounded-lg">
+            <div className="text-2xl font-mono text-green-400">{tensorState.activeLayers}</div>
+            <div className="text-sm text-gray-400">Layers</div>
+          </div>
+          <div className="text-center bg-slate-900/50 p-3 rounded-lg">
+            <div className="text-2xl font-mono text-cyan-400">{tensorState.attentionHeads}</div>
+            <div className="text-sm text-gray-400">Attention Heads</div>
+          </div>
+          <div className="text-center bg-slate-900/50 p-3 rounded-lg">
+            <div className="text-2xl font-mono text-orange-400">{tensorState.embeddingDim}</div>
+            <div className="text-sm text-gray-400">Embedding Dim</div>
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6">
+          <h3 className="text-lg font-semibold mb-4 text-cyan-400">Hilbert Curve Visualization</h3>
+          <div className="flex justify-center">
+            <canvas
+              ref={hilbertCanvasRef}
+              width={300}
+              height={300}
+              className="border border-slate-600 rounded-lg bg-slate-900/50"
+            />
+          </div>
+        </div>
+        <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6">
+          <h3 className="text-lg font-semibold mb-4 text-green-400">ML Spatial Heatmap</h3>
+          <div className="flex justify-center">
+            <canvas
+              ref={heatmapCanvasRef}
+              width={300}
+              height={300}
+              className="border border-slate-600 rounded-lg bg-slate-900/50"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderForcesModule = () => (
+    <div className="space-y-6">
+      <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6">
+        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Zap className="w-5 h-5 text-cyan-400" />
+          Force Fields Analysis
+        </h3>
+        <ResponsiveContainer width="100%" height={400}>
+          <BarChart data={forceData.slice(-10)}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <XAxis dataKey="time" stroke="#9CA3AF" />
+            <YAxis stroke="#9CA3AF" />
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="matrixForce" fill="#06B6D4" name="Matrix" />
+            <Bar dataKey="maxwellForce" fill="#3B82F6" name="Maxwell" />
+            <Bar dataKey="springForce" fill="#10B981" name="Spring" />
+            <Bar dataKey="mlForce" fill="#EF4444" name="ML" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+
+  const renderGpuModule = () => (
+    <div className="space-y-6">
+      <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6">
+        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Cpu className="w-5 h-5 text-cyan-400" />
+          GPU Compute Metrics
+        </h3>
+        <ResponsiveContainer width="100%" height={400}>
+          <AreaChart data={[systemMetrics.gpuCompute]}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <XAxis dataKey="name" />
+            <YAxis />
+            <Tooltip />
+            <Area type="monotone" dataKey="utilization" stackId="1" stroke="#8884d8" fill="#8884d8" name="Utilization" />
+            <Area type="monotone" dataKey="gflops" stackId="1" stroke="#82ca9d" fill="#82ca9d" name="GFLOPS" />
+            <Area type="monotone" dataKey="powerDraw" stackId="1" stroke="#ffc658" fill="#ffc658" name="Power Draw" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+
+  const renderVisualizationModule = () => (
+    <div className="space-y-6">
+      <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6">
+        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Eye className="w-5 h-5 text-cyan-400" />
+          3D Network Visualization
+        </h3>
+        <canvas ref={canvasRef} className="w-full h-[600px] border border-slate-600 rounded-lg" />
+      </div>
+    </div>
+  );
+
+  const renderActiveModule = () => {
+    switch (activeModule) {
+      case 'overview': return <V24Overview />;
+      case 'ml': return renderMLModule();
+      case 'pestle': return renderPestleModule();
+      case 'forces': return renderForcesModule();
+      case 'network': return renderNetworkModule();
+      case 'gpu': return renderGpuModule();
+      case 'tensor': return renderTensorModule();
+      case 'visualization': return renderVisualizationModule();
+      case 'matrix': 
+        // Simple matrix view
+        return (
+          <div className="bg-slate-800/50 backdrop-blur-md border border-slate-600 rounded-xl p-6">
+            <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <GitBranch className="w-5 h-5 text-cyan-400" />
+              6D Matrix
+            </h3>
+            <div className="grid grid-cols-3 gap-4">
+              {Object.entries(matrix6D).map(([key, value]) => (
+                <div key={key} className="text-center bg-slate-900/50 p-4 rounded-lg">
+                  <div className="text-lg font-mono text-cyan-400">{value.toFixed(3)}</div>
+                  <div className="text-sm capitalize">{key}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      default: return <V24Overview />;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
+      <div className="flex h-screen">
+        <div className="w-72 bg-slate-800/50 backdrop-blur-md border-r border-slate-600 p-6">
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              V24 PESTLE-MAXWELL-ML
+            </h1>
+            <p className="text-sm text-gray-400">Advanced AI Framework</p>
+            <div className="mt-2 text-xs text-purple-400">Entities: {businessEntities.length}</div>
+            <div className="text-xs text-green-400">ML Systems: Active</div>
+          </div>
+          <nav className="space-y-2">
+            {modules.map(module => {
+              const Icon = module.icon;
+              return (
+                <button
+                  key={module.id}
+                  onClick={() => setActiveModule(module.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all ${
+                    activeModule === module.id
+                    ? 'bg-gradient-to-r from-purple-600 to-cyan-600 text-white shadow-lg'
+                    : 'text-gray-300 hover:bg-slate-700 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  {module.name}
+                </button>
+              );
+            })}
+          </nav>
+          <div className="mt-8 p-4 bg-gradient-to-br from-slate-900/50 to-purple-900/30 rounded-lg border border-purple-500/30">
+            <div className="text-xs text-gray-400 mb-2">V24 ML System Status</div>
+            <div className={`flex items-center gap-2 ${isSimulating ? 'text-green-400' : 'text-gray-400'}`}>
+              <div className={`w-2 h-2 rounded-full ${isSimulating ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`}></div>
+              {isSimulating ? 'RUNNING' : 'STOPPED'}
+            </div>
+            <div className="text-xs text-cyan-400 mt-1">
+              NN: {mlConfig.neuralNetwork.isTraining ? 'Training' : 'Idle'} ({(mlSystem.neuralNetwork.accuracy * 100).toFixed(0)}%)
+            </div>
+            <div className="text-xs text-purple-400">
+              XOR: {mlConfig.xorNetwork.isTraining ? 'Training' : 'Idle'} ({(mlSystem.xorNetwork.accuracy * 100).toFixed(0)}%)
+            </div>
+            <div className="text-xs text-orange-400">
+              Quantum: {mlSystem.quantumSystem.entanglements.size} entangled
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto">
+          <div className="p-6">
+            {renderActiveModule()}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default UnifiedPESTLEMaxwellMLSystem;
