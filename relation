@@ -580,6 +580,245 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
     return arr.map(val => val / sum);
   }, []);
 
+  // Advanced activation functions with derivatives
+  const activationFunctions = useMemo(() => ({
+    sigmoid: {
+      forward: (x) => {
+        const clampedX = Math.max(-500, Math.min(500, x));
+        return 1 / (1 + Math.exp(-clampedX));
+      },
+      derivative: (x) => {
+        const s = 1 / (1 + Math.exp(-Math.max(-500, Math.min(500, x))));
+        return s * (1 - s);
+      }
+    },
+    relu: {
+      forward: (x) => Math.max(0, x),
+      derivative: (x) => x > 0 ? 1 : 0
+    },
+    leakyRelu: {
+      forward: (x) => x > 0 ? x : 0.01 * x,
+      derivative: (x) => x > 0 ? 1 : 0.01
+    },
+    tanh: {
+      forward: (x) => Math.tanh(Math.max(-500, Math.min(500, x))),
+      derivative: (x) => {
+        const t = Math.tanh(Math.max(-500, Math.min(500, x)));
+        return 1 - t * t;
+      }
+    },
+    swish: {
+      forward: (x) => {
+        const clampedX = Math.max(-500, Math.min(500, x));
+        return x * (1 / (1 + Math.exp(-clampedX)));
+      },
+      derivative: (x) => {
+        const clampedX = Math.max(-500, Math.min(500, x));
+        const sigmoid = 1 / (1 + Math.exp(-clampedX));
+        return sigmoid + x * sigmoid * (1 - sigmoid);
+      }
+    }
+  }), []);
+
+  // Loss functions with derivatives
+  const lossFunctions = useMemo(() => ({
+    meanSquaredError: {
+      forward: (predicted, actual) => {
+        const diff = predicted - actual;
+        return 0.5 * diff * diff;
+      },
+      derivative: (predicted, actual) => predicted - actual
+    },
+    crossEntropy: {
+      forward: (predicted, actual) => {
+        const clampedPred = Math.max(1e-15, Math.min(1 - 1e-15, predicted));
+        return -actual * Math.log(clampedPred) - (1 - actual) * Math.log(1 - clampedPred);
+      },
+      derivative: (predicted, actual) => {
+        const clampedPred = Math.max(1e-15, Math.min(1 - 1e-15, predicted));
+        return (clampedPred - actual) / (clampedPred * (1 - clampedPred));
+      }
+    },
+    huberLoss: {
+      forward: (predicted, actual, delta = 1.0) => {
+        const diff = Math.abs(predicted - actual);
+        return diff <= delta ? 0.5 * diff * diff : delta * (diff - 0.5 * delta);
+      },
+      derivative: (predicted, actual, delta = 1.0) => {
+        const diff = predicted - actual;
+        return Math.abs(diff) <= delta ? diff : delta * Math.sign(diff);
+      }
+    }
+  }), []);
+
+  // Matrix operations for neural networks
+  const matrixOps = useMemo(() => ({
+    multiply: (A, B) => {
+      const result = new Array(A.length);
+      for (let i = 0; i < A.length; i++) {
+        result[i] = new Array(B[0].length);
+        for (let j = 0; j < B[0].length; j++) {
+          result[i][j] = 0;
+          for (let k = 0; k < B.length; k++) {
+            result[i][j] += A[i][k] * B[k][j];
+          }
+        }
+      }
+      return result;
+    },
+    transpose: (matrix) => {
+      const result = new Array(matrix[0].length);
+      for (let i = 0; i < matrix[0].length; i++) {
+        result[i] = new Array(matrix.length);
+        for (let j = 0; j < matrix.length; j++) {
+          result[i][j] = matrix[j][i];
+        }
+      }
+      return result;
+    },
+    vectorAdd: (a, b) => a.map((val, i) => val + b[i]),
+    vectorSubtract: (a, b) => a.map((val, i) => val - b[i]),
+    vectorMultiply: (a, b) => a.map((val, i) => val * b[i]),
+    dotProduct: (a, b) => a.reduce((sum, val, i) => sum + val * b[i], 0),
+    normalize: (vector) => {
+      const norm = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
+      return norm > 0 ? vector.map(val => val / norm) : vector;
+    }
+  }), []);
+
+  // Improved neural network forward pass
+  const neuralNetworkForward = useCallback((input, weights, biases, activation = 'sigmoid') => {
+    const activationFunc = activationFunctions[activation];
+    const layers = [];
+    
+    // Input layer
+    layers.push(input);
+    
+    // Hidden layer 1
+    const hidden1 = new Array(weights.weights1[0].length);
+    for (let j = 0; j < weights.weights1[0].length; j++) {
+      let sum = biases.bias1[j];
+      for (let i = 0; i < input.length; i++) {
+        sum += input[i] * weights.weights1[i][j];
+      }
+      hidden1[j] = activationFunc.forward(sum);
+    }
+    layers.push(hidden1);
+    
+    // Hidden layer 2
+    const hidden2 = new Array(weights.weights2[0].length);
+    for (let j = 0; j < weights.weights2[0].length; j++) {
+      let sum = biases.bias2[j];
+      for (let i = 0; i < hidden1.length; i++) {
+        sum += hidden1[i] * weights.weights2[i][j];
+      }
+      hidden2[j] = activationFunc.forward(sum);
+    }
+    layers.push(hidden2);
+    
+    // Output layer
+    const output = new Array(weights.hiddenWeights[0].length);
+    for (let j = 0; j < weights.hiddenWeights[0].length; j++) {
+      let sum = biases.outputBias[j];
+      for (let i = 0; i < hidden2.length; i++) {
+        sum += hidden2[i] * weights.hiddenWeights[i][j];
+      }
+      output[j] = activationFunc.forward(sum);
+    }
+    layers.push(output);
+    
+    return { layers, output };
+  }, [activationFunctions]);
+
+  // Backpropagation algorithm
+  const neuralNetworkBackward = useCallback((input, target, weights, biases, layers, learningRate = 0.01, activation = 'sigmoid') => {
+    const activationFunc = activationFunctions[activation];
+    const lossFunc = lossFunctions.meanSquaredError;
+    
+    // Calculate output layer error
+    const outputError = new Array(layers[layers.length - 1].length);
+    for (let i = 0; i < outputError.length; i++) {
+      const predicted = layers[layers.length - 1][i];
+      const actual = target[i];
+      outputError[i] = lossFunc.derivative(predicted, actual) * activationFunc.derivative(predicted);
+    }
+    
+    // Calculate hidden layer 2 error
+    const hidden2Error = new Array(layers[layers.length - 2].length);
+    for (let i = 0; i < hidden2Error.length; i++) {
+      let sum = 0;
+      for (let j = 0; j < outputError.length; j++) {
+        sum += outputError[j] * weights.hiddenWeights[i][j];
+      }
+      hidden2Error[i] = sum * activationFunc.derivative(layers[layers.length - 2][i]);
+    }
+    
+    // Calculate hidden layer 1 error
+    const hidden1Error = new Array(layers[layers.length - 3].length);
+    for (let i = 0; i < hidden1Error.length; i++) {
+      let sum = 0;
+      for (let j = 0; j < hidden2Error.length; j++) {
+        sum += hidden2Error[j] * weights.weights2[i][j];
+      }
+      hidden1Error[i] = sum * activationFunc.derivative(layers[layers.length - 3][i]);
+    }
+    
+    // Update weights and biases
+    const weightUpdates = {
+      weights1: new Array(weights.weights1.length),
+      weights2: new Array(weights.weights2.length),
+      hiddenWeights: new Array(weights.hiddenWeights.length)
+    };
+    
+    const biasUpdates = {
+      bias1: new Array(biases.bias1.length),
+      bias2: new Array(biases.bias2.length),
+      outputBias: new Array(biases.outputBias.length)
+    };
+    
+    // Update weights between hidden layer 2 and output
+    for (let i = 0; i < weights.hiddenWeights.length; i++) {
+      weightUpdates.hiddenWeights[i] = new Array(weights.hiddenWeights[i].length);
+      for (let j = 0; j < weights.hiddenWeights[i].length; j++) {
+        const gradient = outputError[j] * layers[layers.length - 2][i];
+        weightUpdates.hiddenWeights[i][j] = -learningRate * gradient;
+      }
+    }
+    
+    // Update weights between hidden layer 1 and hidden layer 2
+    for (let i = 0; i < weights.weights2.length; i++) {
+      weightUpdates.weights2[i] = new Array(weights.weights2[i].length);
+      for (let j = 0; j < weights.weights2[i].length; j++) {
+        const gradient = hidden2Error[j] * layers[layers.length - 3][i];
+        weightUpdates.weights2[i][j] = -learningRate * gradient;
+      }
+    }
+    
+    // Update weights between input and hidden layer 1
+    for (let i = 0; i < weights.weights1.length; i++) {
+      weightUpdates.weights1[i] = new Array(weights.weights1[i].length);
+      for (let j = 0; j < weights.weights1[i].length; j++) {
+        const gradient = hidden1Error[j] * layers[0][i];
+        weightUpdates.weights1[i][j] = -learningRate * gradient;
+      }
+    }
+    
+    // Update biases
+    for (let i = 0; i < biasUpdates.outputBias.length; i++) {
+      biasUpdates.outputBias[i] = -learningRate * outputError[i];
+    }
+    
+    for (let i = 0; i < biasUpdates.bias2.length; i++) {
+      biasUpdates.bias2[i] = -learningRate * hidden2Error[i];
+    }
+    
+    for (let i = 0; i < biasUpdates.bias1.length; i++) {
+      biasUpdates.bias1[i] = -learningRate * hidden1Error[i];
+    }
+    
+    return { weightUpdates, biasUpdates };
+  }, [activationFunctions, lossFunctions]);
+
   const toggleNeuralNetworkTraining = useCallback(() => {
     setMLConfig(prev => ({
       ...prev,
