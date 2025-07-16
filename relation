@@ -66,6 +66,102 @@ const ML_CONSTANTS = {
   }
 };
 
+// System Configuration - Centralized configuration management
+const SYSTEM_CONFIG = {
+  BUSINESS_ENTITIES: {
+    COUNT: 50,
+    SECTORS: ['Technology', 'Healthcare', 'Finance', 'Energy', 'Consumer', 'Industrial', 'Transportation', 'Media'],
+    TYPES: ['Enterprise', 'Academic', 'Government', 'Media'],
+    NAMES: ['Alpha Corp', 'Beta Industries', 'Gamma Tech', 'Delta Solutions', 'Epsilon Labs', 'Zeta Dynamics', 'Sigma Systems', 'Omega Networks'],
+    MARKET_CAP: {
+      ENTERPRISE_BASE: 50e9,
+      ACADEMIC_BASE: 2e9,
+      GOVERNMENT_BASE: 10e9,
+      MEDIA_BASE: 1e9,
+      SCALING_FACTOR: 1.5,
+      NORMALIZATION_FACTOR: 1e9,
+      INFLUENCE_DIVISOR: 20,
+      PRESTIGE_DIVISOR: 10
+    },
+    LEARNING_TOKENS: {
+      BASE: 500,
+      INCREMENT: 10
+    },
+    INNOVATION_LEVELS: {
+      ACADEMIC: 0.8,
+      GOVERNMENT: 0.6,
+      DEFAULT: 0.7
+    },
+    TRUST_LEVELS: {
+      GOVERNMENT: 0.8,
+      ACADEMIC: 0.85,
+      DEFAULT: 0.7
+    }
+  },
+  NEURAL_NETWORK: {
+    ARCHITECTURE: {
+      INPUT_SIZE: 18,
+      HIDDEN_SIZE_1: 64,
+      HIDDEN_SIZE_2: 32,
+      OUTPUT_SIZE: 12
+    },
+    HYPERPARAMETERS: {
+      LEARNING_RATE: 0.005,
+      MAX_EPOCHS: 2000,
+      TARGET_ACCURACY: 0.98,
+      BATCH_SIZE: 32,
+      VALIDATION_SPLIT: 0.2
+    }
+  },
+  XOR_NETWORK: {
+    ARCHITECTURE: {
+      INPUT_SIZE: 2,
+      HIDDEN_SIZE: 3,
+      OUTPUT_SIZE: 1
+    },
+    HYPERPARAMETERS: {
+      LEARNING_RATE: 0.3,
+      MAX_EPOCHS: 2000,
+      TARGET_LOSS: 0.005
+    }
+  },
+  Q_LEARNING: {
+    HYPERPARAMETERS: {
+      ALPHA: 0.1, // Learning rate
+      GAMMA: 0.9, // Discount factor
+      EPSILON: 0.1, // Exploration rate
+      EPSILON_DECAY: 0.995,
+      MIN_EPSILON: 0.01
+    },
+    ACTIONS: ['innovate', 'connect', 'optimize'],
+    REWARD_THRESHOLDS: {
+      INNOVATION: 0.7,
+      CONNECTION_COUNT: 2,
+      COHERENCE: 0.8
+    }
+  },
+  TRANSFORMER: {
+    LAYERS: 8,
+    ATTENTION_HEADS: 32,
+    EMBEDDING_DIM: 1024,
+    SEQUENCE_LENGTH: 50,
+    VOCAB_SIZE: 10000
+  },
+  SPATIAL: {
+    GRID_SIZE: 10,
+    SPACING: 16,
+    Z_LEVELS: 5,
+    Z_SPACING: 8,
+    POSITION_OFFSET: 4.5
+  },
+  PERFORMANCE: {
+    TARGET_TENSOR_OPS: 1800,
+    TARGET_GPU_UTILIZATION: 95,
+    TARGET_CACHE_HIT_RATE: 96,
+    TARGET_CONVERGENCE_RATE: 98.7
+  }
+};
+
 // Neural Network Weight Initialization Strategies
 class WeightInitializer {
   constructor(prng) {
@@ -172,34 +268,59 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
   });
 
   const [businessEntities, setBusinessEntities] = useState(() => {
-    const sectors = ['Technology', 'Healthcare', 'Finance', 'Energy', 'Consumer', 'Industrial', 'Transportation', 'Media'];
-    const types = ['Enterprise', 'Academic', 'Government', 'Media'];
-    const names = ['Alpha Corp', 'Beta Industries', 'Gamma Tech', 'Delta Solutions', 'Epsilon Labs', 'Zeta Dynamics', 'Sigma Systems', 'Omega Networks'];
-    const entities = Array.from({ length: 50 }, (_, i) => {
-      const type = types[i % types.length];
-      const sector = sectors[i % sectors.length];
-      const baseMarketCap = type === 'Enterprise' ? 50e9 : type === 'Academic' ? 2e9 : type === 'Government' ? 10e9 : 1e9;
-      const marketCap = baseMarketCap * (0.5 + (i / 50) * 1.5);
-      const innovation = type === 'Academic' ? 0.8 : type === 'Government' ? 0.6 : 0.7;
-      const trust = type === 'Government' ? 0.8 : type === 'Academic' ? 0.85 : 0.7;
-      const prestige = Math.log(marketCap / 1e9) / 10;
+    const { BUSINESS_ENTITIES } = SYSTEM_CONFIG;
+    const entities = Array.from({ length: BUSINESS_ENTITIES.COUNT }, (_, i) => {
+      const type = BUSINESS_ENTITIES.TYPES[i % BUSINESS_ENTITIES.TYPES.length];
+      const sector = BUSINESS_ENTITIES.SECTORS[i % BUSINESS_ENTITIES.SECTORS.length];
+      
+      // Calculate market cap based on entity type
+      let baseMarketCap;
+      switch (type) {
+        case 'Enterprise':
+          baseMarketCap = BUSINESS_ENTITIES.MARKET_CAP.ENTERPRISE_BASE;
+          break;
+        case 'Academic':
+          baseMarketCap = BUSINESS_ENTITIES.MARKET_CAP.ACADEMIC_BASE;
+          break;
+        case 'Government':
+          baseMarketCap = BUSINESS_ENTITIES.MARKET_CAP.GOVERNMENT_BASE;
+          break;
+        default:
+          baseMarketCap = BUSINESS_ENTITIES.MARKET_CAP.MEDIA_BASE;
+      }
+      
+      const marketCap = baseMarketCap * (0.5 + (i / BUSINESS_ENTITIES.COUNT) * BUSINESS_ENTITIES.MARKET_CAP.SCALING_FACTOR);
+      
+      // Calculate innovation and trust based on entity type
+      const innovation = type === 'Academic' ? BUSINESS_ENTITIES.INNOVATION_LEVELS.ACADEMIC : 
+                        type === 'Government' ? BUSINESS_ENTITIES.INNOVATION_LEVELS.GOVERNMENT : 
+                        BUSINESS_ENTITIES.INNOVATION_LEVELS.DEFAULT;
+      
+      const trust = type === 'Government' ? BUSINESS_ENTITIES.TRUST_LEVELS.GOVERNMENT : 
+                   type === 'Academic' ? BUSINESS_ENTITIES.TRUST_LEVELS.ACADEMIC : 
+                   BUSINESS_ENTITIES.TRUST_LEVELS.DEFAULT;
+                   
+      const prestige = Math.log(marketCap / BUSINESS_ENTITIES.MARKET_CAP.NORMALIZATION_FACTOR) / 
+                      BUSINESS_ENTITIES.MARKET_CAP.PRESTIGE_DIVISOR;
+      
       return {
         id: i + 1,
-        name: `${names[i % names.length]} ${i + 1}`,
+        name: `${BUSINESS_ENTITIES.NAMES[i % BUSINESS_ENTITIES.NAMES.length]} ${i + 1}`,
         type,
         sector,
         marketCap,
         innovation,
         trust,
         prestige,
-        influence: innovation * trust * Math.log(marketCap / 1e9) / 20,
-        learningTokens: 500 + (i * 10),
+        influence: innovation * trust * Math.log(marketCap / BUSINESS_ENTITIES.MARKET_CAP.NORMALIZATION_FACTOR) / 
+                  BUSINESS_ENTITIES.MARKET_CAP.INFLUENCE_DIVISOR,
+        learningTokens: BUSINESS_ENTITIES.LEARNING_TOKENS.BASE + (i * BUSINESS_ENTITIES.LEARNING_TOKENS.INCREMENT),
         spatialEfficiency: 0.5 + (i / 100),
         tokenHistory: [],
         position: {
-          x: (i % 10 - 4.5) * 16,
-          y: (Math.floor(i / 10) - 2.5) * 16,
-          z: ((i % 5) - 2) * 8
+          x: (i % SYSTEM_CONFIG.SPATIAL.GRID_SIZE - SYSTEM_CONFIG.SPATIAL.POSITION_OFFSET) * SYSTEM_CONFIG.SPATIAL.SPACING,
+          y: (Math.floor(i / SYSTEM_CONFIG.SPATIAL.GRID_SIZE) - SYSTEM_CONFIG.SPATIAL.POSITION_OFFSET) * SYSTEM_CONFIG.SPATIAL.SPACING,
+          z: ((i % SYSTEM_CONFIG.SPATIAL.Z_LEVELS) - 2) * SYSTEM_CONFIG.SPATIAL.Z_SPACING
         },
         velocity: { x: 0, y: 0, z: 0 },
         acceleration: { x: 0, y: 0, z: 0 },
@@ -244,27 +365,31 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
   const [v24State, setV24State] = useState({
     memoryUsage: 198,
     latency: 2.8,
-    tensorOps: 1800,
-    gpuUtilization: 95,
+    tensorOps: SYSTEM_CONFIG.PERFORMANCE.TARGET_TENSOR_OPS,
+    gpuUtilization: SYSTEM_CONFIG.PERFORMANCE.TARGET_GPU_UTILIZATION,
     performanceGain: 400,
     hilbertOrder: 6,
     voxelCount: 10800,
     spatialEfficiency: 98.2,
-    cacheHitRate: 96,
-    convergenceRate: 98.7
+    cacheHitRate: SYSTEM_CONFIG.PERFORMANCE.TARGET_CACHE_HIT_RATE,
+    convergenceRate: SYSTEM_CONFIG.PERFORMANCE.TARGET_CONVERGENCE_RATE
   });
 
   const [systemMetrics, setSystemMetrics] = useState({
     v24Transformer: { performance: 94.2, memoryUsage: 847, throughput: 2.4 },
     gpuCompute: { utilization: 87.3, gflops: 4.8, powerDraw: 245 },
-    networkAnalyzer: { nodeCount: 50, edgeCount: 150, clusterCount: 12 },
+    networkAnalyzer: { 
+      nodeCount: SYSTEM_CONFIG.BUSINESS_ENTITIES.COUNT, 
+      edgeCount: SYSTEM_CONFIG.BUSINESS_ENTITIES.COUNT * 3, // 3 connections per entity
+      clusterCount: Math.ceil(SYSTEM_CONFIG.BUSINESS_ENTITIES.COUNT / 4) // Estimate cluster count
+    },
     mlEngine: { accuracy: 92.7, trainingLoss: 0.0234, predictionConfidence: 89.1 }
   });
 
   const [tensorState, setTensorState] = useState({
     activeTokens: 65536,
     hilbertOrder: 8,
-    activeLayers: 21,
+    activeLayers: SYSTEM_CONFIG.TRANSFORMER.LAYERS * 2 + 5, // More layers for processing
     processingNodes: 256,
     tensorShape: [256, 256, 6],
     tokenizedData: null,
@@ -273,9 +398,9 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
     computeShaderCompiled: false,
     workgroupSize: [256, 1, 1],
     parallelOps: 65536,
-    hierarchicalLevels: 8,
-    attentionHeads: 16,
-    embeddingDim: 1024,
+    hierarchicalLevels: SYSTEM_CONFIG.TRANSFORMER.LAYERS,
+    attentionHeads: SYSTEM_CONFIG.TRANSFORMER.ATTENTION_HEADS,
+    embeddingDim: SYSTEM_CONFIG.TRANSFORMER.EMBEDDING_DIM,
     spatialEncoding: true,
     curveLearning: true,
     currentLayerType: 'idle'
@@ -283,19 +408,24 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
 
   const [mlConfig, setMLConfig] = useState({
     neuralNetwork: {
-      inputSize: 18,
-      hiddenSize1: 64, // Enriched: added more hidden layers
-      hiddenSize2: 32,
-      outputSize: 12,
-      learningRate: 0.005, // Adjusted for better convergence
-      maxEpochs: 2000,
-      targetAccuracy: 0.98,
+      inputSize: SYSTEM_CONFIG.NEURAL_NETWORK.ARCHITECTURE.INPUT_SIZE,
+      hiddenSize1: SYSTEM_CONFIG.NEURAL_NETWORK.ARCHITECTURE.HIDDEN_SIZE_1,
+      hiddenSize2: SYSTEM_CONFIG.NEURAL_NETWORK.ARCHITECTURE.HIDDEN_SIZE_2,
+      outputSize: SYSTEM_CONFIG.NEURAL_NETWORK.ARCHITECTURE.OUTPUT_SIZE,
+      learningRate: SYSTEM_CONFIG.NEURAL_NETWORK.HYPERPARAMETERS.LEARNING_RATE,
+      maxEpochs: SYSTEM_CONFIG.NEURAL_NETWORK.HYPERPARAMETERS.MAX_EPOCHS,
+      targetAccuracy: SYSTEM_CONFIG.NEURAL_NETWORK.HYPERPARAMETERS.TARGET_ACCURACY,
+      batchSize: SYSTEM_CONFIG.NEURAL_NETWORK.HYPERPARAMETERS.BATCH_SIZE,
+      validationSplit: SYSTEM_CONFIG.NEURAL_NETWORK.HYPERPARAMETERS.VALIDATION_SPLIT,
       isTraining: false
     },
     xorNetwork: {
-      learningRate: 0.3,
-      maxEpochs: 2000,
-      targetLoss: 0.005,
+      inputSize: SYSTEM_CONFIG.XOR_NETWORK.ARCHITECTURE.INPUT_SIZE,
+      hiddenSize: SYSTEM_CONFIG.XOR_NETWORK.ARCHITECTURE.HIDDEN_SIZE,
+      outputSize: SYSTEM_CONFIG.XOR_NETWORK.ARCHITECTURE.OUTPUT_SIZE,
+      learningRate: SYSTEM_CONFIG.XOR_NETWORK.HYPERPARAMETERS.LEARNING_RATE,
+      maxEpochs: SYSTEM_CONFIG.XOR_NETWORK.HYPERPARAMETERS.MAX_EPOCHS,
+      targetLoss: SYSTEM_CONFIG.XOR_NETWORK.HYPERPARAMETERS.TARGET_LOSS,
       isTraining: false
     },
     bayesian: {
@@ -304,48 +434,72 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
       evidenceThreshold: 0.5
     },
     quantum: {
-      coherenceDecay: 0.99,
-      entanglementThreshold: 0.6,
-      superpositionRange: 0.1
+      coherenceDecay: ML_CONSTANTS.LEARNING.ADAPTIVE_LR_DECAY,
+      entanglementThreshold: ML_CONSTANTS.QUANTUM.ENTANGLEMENT_THRESHOLD,
+      superpositionRange: 0.1,
+      decoherenceTime: ML_CONSTANTS.QUANTUM.DECOHERENCE_TIME
     },
-    // Enriched: Added simple Q-learning config for entity decision simulation
     qLearning: {
-      alpha: 0.1, // Learning rate
-      gamma: 0.9, // Discount factor
-      epsilon: 0.1, // Exploration rate
-      actions: ['innovate', 'connect', 'optimize'], // Sample actions
+      alpha: SYSTEM_CONFIG.Q_LEARNING.HYPERPARAMETERS.ALPHA,
+      gamma: SYSTEM_CONFIG.Q_LEARNING.HYPERPARAMETERS.GAMMA,
+      epsilon: SYSTEM_CONFIG.Q_LEARNING.HYPERPARAMETERS.EPSILON,
+      epsilonDecay: SYSTEM_CONFIG.Q_LEARNING.HYPERPARAMETERS.EPSILON_DECAY,
+      minEpsilon: SYSTEM_CONFIG.Q_LEARNING.HYPERPARAMETERS.MIN_EPSILON,
+      actions: SYSTEM_CONFIG.Q_LEARNING.ACTIONS,
+      rewardThresholds: SYSTEM_CONFIG.Q_LEARNING.REWARD_THRESHOLDS,
       isTraining: false
     }
   });
 
   const [mlSystem, setMLSystem] = useState(() => {
+    const { NEURAL_NETWORK, XOR_NETWORK } = SYSTEM_CONFIG;
+    
     return {
       neuralNetwork: {
-        weights1: weightInitializer.initializeMatrix(18, 64, 'xavier'),
-        weights2: weightInitializer.initializeMatrix(64, 32, 'xavier'),
-        hiddenWeights: weightInitializer.initializeMatrix(32, 12, 'xavier'),
-        bias1: weightInitializer.initializeBias(64),
-        bias2: weightInitializer.initializeBias(32),
-        outputBias: weightInitializer.initializeBias(12),
+        weights1: weightInitializer.initializeMatrix(
+          NEURAL_NETWORK.ARCHITECTURE.INPUT_SIZE, 
+          NEURAL_NETWORK.ARCHITECTURE.HIDDEN_SIZE_1, 
+          'xavier'
+        ),
+        weights2: weightInitializer.initializeMatrix(
+          NEURAL_NETWORK.ARCHITECTURE.HIDDEN_SIZE_1, 
+          NEURAL_NETWORK.ARCHITECTURE.HIDDEN_SIZE_2, 
+          'xavier'
+        ),
+        hiddenWeights: weightInitializer.initializeMatrix(
+          NEURAL_NETWORK.ARCHITECTURE.HIDDEN_SIZE_2, 
+          NEURAL_NETWORK.ARCHITECTURE.OUTPUT_SIZE, 
+          'xavier'
+        ),
+        bias1: weightInitializer.initializeBias(NEURAL_NETWORK.ARCHITECTURE.HIDDEN_SIZE_1),
+        bias2: weightInitializer.initializeBias(NEURAL_NETWORK.ARCHITECTURE.HIDDEN_SIZE_2),
+        outputBias: weightInitializer.initializeBias(NEURAL_NETWORK.ARCHITECTURE.OUTPUT_SIZE),
         epochs: 0,
         loss: 1.0,
         accuracy: 0,
         lastUpdate: 0,
         // Add momentum and adaptive learning rate tracking
-        momentum1: new Array(18).fill(0).map(() => new Array(64).fill(0)),
-        momentum2: new Array(64).fill(0).map(() => new Array(32).fill(0)),
-        momentumHidden: new Array(32).fill(0).map(() => new Array(12).fill(0)),
-        velocityBias1: new Array(64).fill(0),
-        velocityBias2: new Array(32).fill(0),
-        velocityOutputBias: new Array(12).fill(0)
+        momentum1: new Array(NEURAL_NETWORK.ARCHITECTURE.INPUT_SIZE).fill(0)
+          .map(() => new Array(NEURAL_NETWORK.ARCHITECTURE.HIDDEN_SIZE_1).fill(0)),
+        momentum2: new Array(NEURAL_NETWORK.ARCHITECTURE.HIDDEN_SIZE_1).fill(0)
+          .map(() => new Array(NEURAL_NETWORK.ARCHITECTURE.HIDDEN_SIZE_2).fill(0)),
+        momentumHidden: new Array(NEURAL_NETWORK.ARCHITECTURE.HIDDEN_SIZE_2).fill(0)
+          .map(() => new Array(NEURAL_NETWORK.ARCHITECTURE.OUTPUT_SIZE).fill(0)),
+        velocityBias1: new Array(NEURAL_NETWORK.ARCHITECTURE.HIDDEN_SIZE_1).fill(0),
+        velocityBias2: new Array(NEURAL_NETWORK.ARCHITECTURE.HIDDEN_SIZE_2).fill(0),
+        velocityOutputBias: new Array(NEURAL_NETWORK.ARCHITECTURE.OUTPUT_SIZE).fill(0)
       },
       xorNetwork: {
         weights: {
-          hidden: weightInitializer.initializeMatrix(3, 2, 'xavier'),
-          output: weightInitializer.initializeBias(3)
+          hidden: weightInitializer.initializeMatrix(
+            XOR_NETWORK.ARCHITECTURE.HIDDEN_SIZE, 
+            XOR_NETWORK.ARCHITECTURE.INPUT_SIZE, 
+            'xavier'
+          ),
+          output: weightInitializer.initializeBias(XOR_NETWORK.ARCHITECTURE.HIDDEN_SIZE)
         },
         biases: {
-          hidden: weightInitializer.initializeBias(3),
+          hidden: weightInitializer.initializeBias(XOR_NETWORK.ARCHITECTURE.HIDDEN_SIZE),
           output: prng.nextGaussian(0, ML_CONSTANTS.INITIALIZATION.BIAS_INIT_SCALE)
         },
         accuracy: 0,
@@ -354,11 +508,12 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
         lastUpdate: 0,
         // Add momentum tracking
         momentumWeights: {
-          hidden: new Array(3).fill(0).map(() => new Array(2).fill(0)),
-          output: new Array(3).fill(0)
+          hidden: new Array(XOR_NETWORK.ARCHITECTURE.HIDDEN_SIZE).fill(0)
+            .map(() => new Array(XOR_NETWORK.ARCHITECTURE.INPUT_SIZE).fill(0)),
+          output: new Array(XOR_NETWORK.ARCHITECTURE.HIDDEN_SIZE).fill(0)
         },
         momentumBiases: {
-          hidden: new Array(3).fill(0),
+          hidden: new Array(XOR_NETWORK.ARCHITECTURE.HIDDEN_SIZE).fill(0),
           output: 0
         }
       },
@@ -837,14 +992,14 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
           actionIndex = qValues.indexOf(Math.max(...qValues));
         }
 
-        // Simulate reward based on action
+        // Simulate reward based on action using configuration thresholds
         let reward = 0;
         if (mlConfig.qLearning.actions[actionIndex] === 'innovate') {
-          reward = entity.state.innovation > 0.7 ? 1 : -0.5;
+          reward = entity.state.innovation > mlConfig.qLearning.rewardThresholds.INNOVATION ? 1 : -0.5;
         } else if (mlConfig.qLearning.actions[actionIndex] === 'connect') {
-          reward = entity.connections.length > 2 ? 1 : -0.5;
+          reward = entity.connections.length > mlConfig.qLearning.rewardThresholds.CONNECTION_COUNT ? 1 : -0.5;
         } else if (mlConfig.qLearning.actions[actionIndex] === 'optimize') {
-          reward = entity.state.coherence > 0.8 ? 1 : -0.5;
+          reward = entity.state.coherence > mlConfig.qLearning.rewardThresholds.COHERENCE ? 1 : -0.5;
         }
 
         // Next state
@@ -918,8 +1073,8 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
 
   const processTransformerLayers = useCallback((tokens) => {
     const layers = [];
-    const numLayers = 8; // Enriched: more layers for deeper processing
-    const attentionHeads = 32; // Enriched: more heads
+    const numLayers = SYSTEM_CONFIG.TRANSFORMER.LAYERS;
+    const attentionHeads = SYSTEM_CONFIG.TRANSFORMER.ATTENTION_HEADS;
     for (let layer = 0; layer < numLayers; layer++) {
       const layerTokens = tokens.map(token => ({ ...token }));
       layerTokens.forEach((token, i) => {
@@ -983,7 +1138,7 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
       const { tensor, tokens } = tokenizeHeatMap(matrix6D, businessEntities);
       const { transformerOutput, layerAnalysis } = processTransformerLayers(tokens);
       const bayesianPredictions = bayesianInference(transformerOutput, matrix6D);
-      const numLayers = 8; // Declare explicitly to match usage
+      const numLayers = SYSTEM_CONFIG.TRANSFORMER.LAYERS; // Use configuration value
       const tensorInsights = {
         innovation_momentum: transformerOutput.filter(t => t.position.matrix_i === 0).reduce((sum, t) => sum + t.value, 0) / transformerOutput.length,
         trust_network_strength: transformerOutput.filter(t => t.position.matrix_i === 1).reduce((sum, t) => sum + t.value, 0) / transformerOutput.length,
