@@ -1573,40 +1573,378 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
     return { tensor, tokens };
   }, []);
 
+  // Multi-head attention mechanism
+  const multiHeadAttention = useCallback((queries, keys, values, numHeads, embeddingDim) => {
+    const headDim = embeddingDim / numHeads;
+    const attentionOutputs = [];
+    
+    for (let head = 0; head < numHeads; head++) {
+      const headQueries = queries.map(q => q.slice(head * headDim, (head + 1) * headDim));
+      const headKeys = keys.map(k => k.slice(head * headDim, (head + 1) * headDim));
+      const headValues = values.map(v => v.slice(head * headDim, (head + 1) * headDim));
+      
+      // Scaled dot-product attention
+      const attentionScores = headQueries.map(query => 
+        headKeys.map(key => {
+          const dotProduct = query.reduce((sum, val, i) => sum + val * key[i], 0);
+          return dotProduct / Math.sqrt(headDim);
+        })
+      );
+      
+      // Softmax attention weights
+      const attentionWeights = attentionScores.map(scores => {
+        const maxScore = Math.max(...scores);
+        const expScores = scores.map(score => Math.exp(score - maxScore));
+        const sumExp = expScores.reduce((sum, val) => sum + val, 0);
+        return expScores.map(exp => exp / sumExp);
+      });
+      
+      // Weighted sum of values
+      const attentionOutput = attentionWeights.map(weights => 
+        headValues.reduce((sum, value, i) => 
+          sum.map((val, j) => val + weights[i] * value[j]), 
+          new Array(headDim).fill(0)
+        )
+      );
+      
+      attentionOutputs.push(attentionOutput);
+    }
+    
+    // Concatenate all heads
+    return attentionOutputs[0].map((_, tokenIndex) => 
+      attentionOutputs.reduce((concat, headOutput) => 
+        concat.concat(headOutput[tokenIndex]), []
+      )
+    );
+  }, []);
+
+  // Layer normalization
+  const layerNormalization = useCallback((input, epsilon = 1e-6) => {
+    const mean = input.reduce((sum, val) => sum + val, 0) / input.length;
+    const variance = input.reduce((sum, val) => sum + (val - mean) ** 2, 0) / input.length;
+    const stdDev = Math.sqrt(variance + epsilon);
+    return input.map(val => (val - mean) / stdDev);
+  }, []);
+
+  // Feed-forward network
+  const feedForward = useCallback((input, weights1, bias1, weights2, bias2) => {
+    // First linear transformation + ReLU
+    const hidden = input.map((val, i) => 
+      Math.max(0, weights1[i].reduce((sum, w, j) => sum + w * val, 0) + bias1[i])
+    );
+    
+    // Second linear transformation
+    return hidden.map((val, i) => 
+      weights2[i].reduce((sum, w, j) => sum + w * val, 0) + bias2[i]
+    );
+  }, []);
+
   const processTransformerLayers = useCallback((tokens) => {
     const layers = [];
     const numLayers = SYSTEM_CONFIG.TRANSFORMER.LAYERS;
     const attentionHeads = SYSTEM_CONFIG.TRANSFORMER.ATTENTION_HEADS;
+    const embeddingDim = SYSTEM_CONFIG.TRANSFORMER.EMBEDDING_DIM;
+    
+    // Convert tokens to embeddings
+    let currentTokens = tokens.map(token => ({
+      ...token,
+      embedding: new Array(embeddingDim).fill(0).map((_, i) => 
+        Math.sin(token.value * (i + 1)) * token.attention
+      )
+    }));
+    
     for (let layer = 0; layer < numLayers; layer++) {
-      const layerTokens = tokens.map(token => ({ ...token }));
+      const layerTokens = currentTokens.map(token => ({ ...token }));
+      
+      // Self-attention mechanism
+      const embeddings = layerTokens.map(token => token.embedding);
+      const attentionOutput = multiHeadAttention(
+        embeddings, // queries
+        embeddings, // keys  
+        embeddings, // values
+        attentionHeads,
+        embeddingDim
+      );
+      
+      // Residual connection + layer normalization
       layerTokens.forEach((token, i) => {
+        const residual = token.embedding.map((val, j) => val + attentionOutput[i][j]);
+        token.embedding = layerNormalization(residual);
+      });
+      
+      // Feed-forward network (simplified)
+      layerTokens.forEach((token, i) => {
+        const ffWeights1 = new Array(embeddingDim).fill(0).map(() => 
+          new Array(embeddingDim * 4).fill(0).map(() => 
+            weightInitializer.xavierNormal(embeddingDim, embeddingDim * 4)
+          )
+        );
+        const ffBias1 = new Array(embeddingDim * 4).fill(0);
+        const ffWeights2 = new Array(embeddingDim * 4).fill(0).map(() => 
+          new Array(embeddingDim).fill(0).map(() => 
+            weightInitializer.xavierNormal(embeddingDim * 4, embeddingDim)
+          )
+        );
+        const ffBias2 = new Array(embeddingDim).fill(0);
+        
+        const ffOutput = feedForward(token.embedding, ffWeights1, ffBias1, ffWeights2, ffBias2);
+        
+        // Residual connection + layer normalization
+        const residual = token.embedding.map((val, j) => val + ffOutput[j]);
+        token.embedding = layerNormalization(residual);
+      });
+      
+      // Update token values and attention based on embeddings
+      layerTokens.forEach((token, i) => {
+        // Extract meaningful features from embeddings
+        const embeddingMagnitude = Math.sqrt(
+          token.embedding.reduce((sum, val) => sum + val * val, 0)
+        );
+        
+        // Update token value based on embedding
+        token.value = Math.tanh(embeddingMagnitude * 0.1);
+        
+        // Calculate attention based on embedding similarity with other tokens
         const attentionSum = layerTokens.reduce((sum, otherToken, j) => {
           if (i !== j) {
-            const distance = Math.abs(token.position.node - otherToken.position.node);
-            const attention = Math.exp(-distance / 10);
-            return sum + attention * otherToken.value;
+            const similarity = token.embedding.reduce((dot, val, k) => 
+              dot + val * otherToken.embedding[k], 0
+            ) / (embeddingMagnitude * Math.sqrt(
+              otherToken.embedding.reduce((sum, val) => sum + val * val, 0)
+            ));
+            return sum + Math.max(0, similarity);
           }
           return sum;
         }, 0);
-        token.value = token.value + (attentionSum / layerTokens.length) * 0.1;
-        // Update attention based on the gradient of attention with respect to value change
-        const attentionGradient = Math.tanh(attentionSum * 0.1) * 0.1;
-        token.attention = Math.min(1, token.attention + attentionGradient);
+        
+        // Update attention with softmax-like normalization
+        const attentionScore = Math.exp(attentionSum / layerTokens.length);
+        const totalAttention = layerTokens.reduce((sum, t) => 
+          sum + Math.exp(t.attention || 0), 0
+        );
+        token.attention = attentionScore / totalAttention;
+        
+        // Positional encoding influence
+        const positionEncoding = Math.sin(token.position.node * 0.1 + layer * 0.01);
+        token.value += positionEncoding * 0.05;
+        
         token.layer = layer;
       });
+      
       layers.push(layerTokens);
+      currentTokens = layerTokens;
     }
+    
     const transformerOutput = layers[layers.length - 1];
+    
+    // Enhanced layer analysis with attention visualization
     const layerAnalysis = {};
     layers.forEach((layerTokens, layerIndex) => {
       layerAnalysis[layerIndex] = layerTokens.map(token => ({
         value: token.value,
         attention: token.attention,
-        position: token.position
+        position: token.position,
+        embeddingNorm: Math.sqrt(token.embedding.reduce((sum, val) => sum + val * val, 0)),
+        layer: layerIndex
       }));
     });
+    
     return { transformerOutput, layerAnalysis };
+  }, [multiHeadAttention, layerNormalization, feedForward, weightInitializer]);
+
+  // Comprehensive evaluation metrics
+  const evaluationMetrics = useMemo(() => ({
+    // Classification metrics
+    accuracy: (predictions, targets) => {
+      const correct = predictions.filter((pred, i) => 
+        Math.abs(pred - targets[i]) < 0.1
+      ).length;
+      return correct / predictions.length;
+    },
+    
+    precision: (predictions, targets, threshold = 0.5) => {
+      const truePositives = predictions.filter((pred, i) => 
+        pred > threshold && targets[i] > threshold
+      ).length;
+      const falsePositives = predictions.filter((pred, i) => 
+        pred > threshold && targets[i] <= threshold
+      ).length;
+      return truePositives / (truePositives + falsePositives) || 0;
+    },
+    
+    recall: (predictions, targets, threshold = 0.5) => {
+      const truePositives = predictions.filter((pred, i) => 
+        pred > threshold && targets[i] > threshold
+      ).length;
+      const falseNegatives = predictions.filter((pred, i) => 
+        pred <= threshold && targets[i] > threshold
+      ).length;
+      return truePositives / (truePositives + falseNegatives) || 0;
+    },
+    
+    f1Score: (predictions, targets, threshold = 0.5) => {
+      const precision = evaluationMetrics.precision(predictions, targets, threshold);
+      const recall = evaluationMetrics.recall(predictions, targets, threshold);
+      return 2 * (precision * recall) / (precision + recall) || 0;
+    },
+    
+    // Regression metrics
+    meanSquaredError: (predictions, targets) => {
+      const errors = predictions.map((pred, i) => (pred - targets[i]) ** 2);
+      return errors.reduce((sum, error) => sum + error, 0) / errors.length;
+    },
+    
+    meanAbsoluteError: (predictions, targets) => {
+      const errors = predictions.map((pred, i) => Math.abs(pred - targets[i]));
+      return errors.reduce((sum, error) => sum + error, 0) / errors.length;
+    },
+    
+    rootMeanSquaredError: (predictions, targets) => {
+      return Math.sqrt(evaluationMetrics.meanSquaredError(predictions, targets));
+    },
+    
+    r2Score: (predictions, targets) => {
+      const targetMean = targets.reduce((sum, val) => sum + val, 0) / targets.length;
+      const totalSumSquares = targets.reduce((sum, val) => sum + (val - targetMean) ** 2, 0);
+      const residualSumSquares = predictions.reduce((sum, pred, i) => 
+        sum + (targets[i] - pred) ** 2, 0
+      );
+      return 1 - (residualSumSquares / totalSumSquares);
+    },
+    
+    // Information theory metrics
+    crossEntropy: (predictions, targets) => {
+      const entropy = predictions.reduce((sum, pred, i) => {
+        const clampedPred = Math.max(1e-15, Math.min(1 - 1e-15, pred));
+        const target = targets[i];
+        return sum - target * Math.log(clampedPred) - (1 - target) * Math.log(1 - clampedPred);
+      }, 0);
+      return entropy / predictions.length;
+    },
+    
+    // Statistical significance tests
+    tTest: (sample1, sample2) => {
+      const mean1 = sample1.reduce((sum, val) => sum + val, 0) / sample1.length;
+      const mean2 = sample2.reduce((sum, val) => sum + val, 0) / sample2.length;
+      
+      const var1 = sample1.reduce((sum, val) => sum + (val - mean1) ** 2, 0) / (sample1.length - 1);
+      const var2 = sample2.reduce((sum, val) => sum + (val - mean2) ** 2, 0) / (sample2.length - 1);
+      
+      const pooledVar = ((sample1.length - 1) * var1 + (sample2.length - 1) * var2) / 
+                       (sample1.length + sample2.length - 2);
+      
+      const standardError = Math.sqrt(pooledVar * (1/sample1.length + 1/sample2.length));
+      const tStatistic = (mean1 - mean2) / standardError;
+      
+      return {
+        tStatistic,
+        degreesOfFreedom: sample1.length + sample2.length - 2,
+        pValue: 2 * (1 - normalCDF(Math.abs(tStatistic))) // Approximate p-value
+      };
+    }
+  }), []);
+
+  // Normal cumulative distribution function approximation
+  const normalCDF = useCallback((x) => {
+    const a1 = 0.254829592;
+    const a2 = -0.284496736;
+    const a3 = 1.421413741;
+    const a4 = -1.453152027;
+    const a5 = 1.061405429;
+    const p = 0.3275911;
+    
+    const sign = x < 0 ? -1 : 1;
+    x = Math.abs(x);
+    
+    const t = 1.0 / (1.0 + p * x);
+    const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+    
+    return 0.5 * (1.0 + sign * y);
   }, []);
+
+  // Cross-validation implementation
+  const crossValidation = useCallback((data, kFolds = 5) => {
+    const foldSize = Math.floor(data.length / kFolds);
+    const results = [];
+    
+    for (let fold = 0; fold < kFolds; fold++) {
+      const startIdx = fold * foldSize;
+      const endIdx = fold === kFolds - 1 ? data.length : startIdx + foldSize;
+      
+      const testData = data.slice(startIdx, endIdx);
+      const trainData = [...data.slice(0, startIdx), ...data.slice(endIdx)];
+      
+      // Perform training and evaluation (simplified)
+      const trainPredictions = trainData.map(d => d.features[0] * 0.5); // Simplified
+      const testPredictions = testData.map(d => d.features[0] * 0.5);
+      
+      const trainTargets = trainData.map(d => d.target[0]);
+      const testTargets = testData.map(d => d.target[0]);
+      
+      const foldResult = {
+        fold,
+        trainAccuracy: evaluationMetrics.accuracy(trainPredictions, trainTargets),
+        testAccuracy: evaluationMetrics.accuracy(testPredictions, testTargets),
+        trainMSE: evaluationMetrics.meanSquaredError(trainPredictions, trainTargets),
+        testMSE: evaluationMetrics.meanSquaredError(testPredictions, testTargets)
+      };
+      
+      results.push(foldResult);
+    }
+    
+    return {
+      foldResults: results,
+      avgTrainAccuracy: results.reduce((sum, r) => sum + r.trainAccuracy, 0) / results.length,
+      avgTestAccuracy: results.reduce((sum, r) => sum + r.testAccuracy, 0) / results.length,
+      avgTrainMSE: results.reduce((sum, r) => sum + r.trainMSE, 0) / results.length,
+      avgTestMSE: results.reduce((sum, r) => sum + r.testMSE, 0) / results.length
+    };
+  }, [evaluationMetrics]);
+
+  // Model validation and performance monitoring
+  const validateModel = useCallback((modelType, predictions, targets) => {
+    const metrics = {
+      accuracy: evaluationMetrics.accuracy(predictions, targets),
+      precision: evaluationMetrics.precision(predictions, targets),
+      recall: evaluationMetrics.recall(predictions, targets),
+      f1Score: evaluationMetrics.f1Score(predictions, targets),
+      mse: evaluationMetrics.meanSquaredError(predictions, targets),
+      mae: evaluationMetrics.meanAbsoluteError(predictions, targets),
+      rmse: evaluationMetrics.rootMeanSquaredError(predictions, targets),
+      r2: evaluationMetrics.r2Score(predictions, targets),
+      crossEntropy: evaluationMetrics.crossEntropy(predictions, targets)
+    };
+    
+    // Performance thresholds
+    const thresholds = {
+      accuracy: 0.8,
+      precision: 0.75,
+      recall: 0.75,
+      f1Score: 0.75,
+      mse: 0.1,
+      mae: 0.2,
+      rmse: 0.3,
+      r2: 0.7
+    };
+    
+    const performance = {
+      modelType,
+      metrics,
+      thresholds,
+      passed: {},
+      overallPassed: true
+    };
+    
+    Object.keys(thresholds).forEach(metric => {
+      const passed = metric === 'mse' || metric === 'mae' || metric === 'rmse' ? 
+                    metrics[metric] < thresholds[metric] : 
+                    metrics[metric] > thresholds[metric];
+      performance.passed[metric] = passed;
+      if (!passed) performance.overallPassed = false;
+    });
+    
+    return performance;
+  }, [evaluationMetrics]);
 
   const bayesianInference = useCallback((transformerOutput, matrix6D) => {
     const priors = {
