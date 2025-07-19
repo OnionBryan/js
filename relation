@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ScatterChart, Scatter, AreaChart, Area, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { Play, Pause, RotateCcw, Download, Settings, Zap, Activity, TrendingUp, Network, Cpu, Database, GitBranch, Brain, Layers, Target, FileText, Eye, Cog } from 'lucide-react';
 
+import * as tf from "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.16.0/dist/tf.esm.min.js";
 // Proper Pseudorandom Number Generator (Mersenne Twister-like implementation)
 class PseudoRandomNumberGenerator {
   constructor(seed = 12345) {
@@ -439,6 +440,8 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
   const hilbertCanvasRef = useRef(null);
   const heatmapCanvasRef = useRef(null);
 
+  const tfModelRef = useRef(null);
+  const tfOptimizerRef = useRef(null);
   const sigmoid = useCallback((x) => {
     if (!isFinite(x)) return x > 0 ? 1 : 0;
     const clampedX = Math.max(-500, Math.min(500, x));
@@ -467,6 +470,16 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
     return arr.map(val => val / sum);
   }, []);
 
+  useEffect(() => {
+    const model = tf.sequential();
+    model.add(tf.layers.dense({ units: mlConfig.neuralNetwork.hiddenSize1, inputShape: [mlConfig.neuralNetwork.inputSize], activation: "relu" }));
+    model.add(tf.layers.dense({ units: mlConfig.neuralNetwork.hiddenSize2, activation: "relu" }));
+    model.add(tf.layers.dense({ units: mlConfig.neuralNetwork.outputSize, activation: "sigmoid" }));
+    const optimizer = tf.train.adam(mlConfig.neuralNetwork.learningRate);
+    model.compile({ optimizer, loss: "meanSquaredError" });
+    tfModelRef.current = model;
+    tfOptimizerRef.current = optimizer;
+  }, []);
   const toggleNeuralNetworkTraining = useCallback(() => {
     setMLConfig(prev => ({
       ...prev,
@@ -497,160 +510,87 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
     }));
   }, []);
 
-  const trainNeuralNetworkStep = useCallback(() => {
-    if (!mlConfig.neuralNetwork.isTraining) return;
+const trainNeuralNetworkStep = useCallback(async () => {
+  if (!mlConfig.neuralNetwork.isTraining || !tfModelRef.current) return;
 
-    const extractFeatures = (entity) => {
-      const features = [
-        pestleFactors.political || 0, pestleFactors.economic || 0, pestleFactors.social || 0,
-        pestleFactors.technological || 0, pestleFactors.legal || 0, pestleFactors.environmental || 0,
-        entity.innovation || 0, entity.trust || 0, entity.prestige || 0,
-        entity.state?.wants || 0, entity.state?.needs || 0, entity.state?.coherence || 0,
-        Math.log(Math.max(entity.marketCap, 1e6) / 1e9) / 10, entity.influence || 0,
-        (entity.position?.x || 0) / 100, (entity.position?.y || 0) / 100, entity.mlState?.centrality || 0,
-        entity.mlState?.confidence || 0.5
-      ];
-      return features.map(f => isFinite(f) ? f : 0);
-    };
+  const extractFeatures = (entity) => {
+    const features = [
+      pestleFactors.political || 0, pestleFactors.economic || 0, pestleFactors.social || 0,
+      pestleFactors.technological || 0, pestleFactors.legal || 0, pestleFactors.environmental || 0,
+      entity.innovation || 0, entity.trust || 0, entity.prestige || 0,
+      entity.state?.wants || 0, entity.state?.needs || 0, entity.state?.coherence || 0,
+      Math.log(Math.max(entity.marketCap, 1e6) / 1e9) / 10, entity.influence || 0,
+      (entity.position?.x || 0) / 100, (entity.position?.y || 0) / 100, entity.mlState?.centrality || 0,
+      entity.mlState?.confidence || 0.5
+    ];
+    return features.map(f => (isFinite(f) ? f : 0));
+  };
 
-    const extractTarget = (entity) => {
-      const target = [
-        entity.state?.innovation || 0, entity.state?.trust || 0, entity.state?.prestige || 0,
-        entity.state?.wants || 0, entity.state?.needs || 0, entity.state?.coherence || 0,
-        entity.mlState?.neuralActivation || 0, entity.mlState?.bayesianBelief || 0.5,
-        entity.influence || 0, entity.spatialEfficiency || 0.5,
-        Math.sin((entity.position?.x || 0) / 50), Math.cos((entity.position?.y || 0) / 50)
-      ];
-      return target.map(t => isFinite(t) ? Math.max(0, Math.min(1, t)) : 0.5);
-    };
+  const extractTarget = (entity) => {
+    const target = [
+      entity.state?.innovation || 0, entity.state?.trust || 0, entity.state?.prestige || 0,
+      entity.state?.wants || 0, entity.state?.needs || 0, entity.state?.coherence || 0,
+      entity.mlState?.neuralActivation || 0, entity.mlState?.bayesianBelief || 0.5,
+      entity.influence || 0, entity.spatialEfficiency || 0.5,
+      Math.sin((entity.position?.x || 0) / 50), Math.cos((entity.position?.y || 0) / 50)
+    ];
+    return target.map(t => (isFinite(t) ? Math.max(0, Math.min(1, t)) : 0.5));
+  };
 
-    const trainingData = businessEntities.map(entity => ({
-      features: extractFeatures(entity),
-      target: extractTarget(entity)
-    })).filter(data => data.features.every(f => isFinite(f)) && data.target.every(t => isFinite(t)));
+  const trainingData = businessEntities.map(entity => ({
+    features: extractFeatures(entity),
+    target: extractTarget(entity)
+  })).filter(d => d.features.every(f => isFinite(f)) && d.target.every(t => isFinite(t)));
+  if (trainingData.length === 0) return;
 
-    if (trainingData.length === 0) return;
+  const batchSize = Math.min(16, trainingData.length);
+  const selected = trainingData.slice(0, batchSize);
+  const xs = tf.tensor2d(selected.map(d => d.features));
+  const ys = tf.tensor2d(selected.map(d => d.target));
 
-    setMLSystem(prev => {
-      const nn = { ...prev.neuralNetwork };
-      let totalLoss = 0;
-      let correct = 0;
-      const batchSize = Math.min(16, trainingData.length); // Enriched: larger batch for better convergence
-      const selectedData = trainingData.slice(0, batchSize);
+  let lossValue = 0;
+  await tfOptimizerRef.current.minimize(() => {
+    const preds = tfModelRef.current.apply(xs);
+    const loss = tf.losses.meanSquaredError(ys, preds).mean();
+    lossValue = loss.dataSync()[0];
+    return loss;
+  }, true, tfModelRef.current.trainableWeights);
 
-      selectedData.forEach(({ features, target }) => {
-        // Forward pass with deeper network
-        const hidden1 = nn.weights1.map((neuronWeights, i) => {
-          const sum = features.reduce((acc, val, j) => 
-            safeAdd(acc, safeMult(val, neuronWeights[j] || 0)), 0) + (nn.bias1[i] || 0);
-          return relu(sum); // Enriched: use ReLU for hidden layers
-        });
+  const preds = tfModelRef.current.predict(xs);
+  const predArr = await preds.array();
+  xs.dispose(); ys.dispose(); preds.dispose();
 
-        const hidden2 = nn.weights2.map((neuronWeights, i) => {
-          const sum = hidden1.reduce((acc, val, j) => 
-            safeAdd(acc, safeMult(val, neuronWeights[j] || 0)), 0) + (nn.bias2[i] || 0);
-          return relu(sum);
-        });
+  let correct = 0;
+  predArr.forEach((out, idx) => {
+    const targ = selected[idx].target;
+    const diff = out.map((o, i) => o - targ[i]);
+    const mse = diff.reduce((s, e) => s + e * e, 0) / diff.length;
+    if (mse < 0.05) correct++;
+  });
 
-        const output = nn.hiddenWeights.map((neuronWeights, i) => {
-          const sum = hidden2.reduce((acc, val, j) => 
-            safeAdd(acc, safeMult(val, neuronWeights[j] || 0)), 0) + (nn.outputBias[i] || 0);
-          return sigmoid(sum);
-        });
-
-        const error = target.map((t, i) => t - output[i]).filter(e => isFinite(e));
-        const loss = error.reduce((sum, e) => sum + e * e, 0) / Math.max(error.length, 1);
-
-        if (isFinite(loss) && !isNaN(loss)) {
-          totalLoss += loss;
-          if (loss < 0.05) correct++;
-        }
-
-        const learningRate = mlConfig.neuralNetwork.learningRate;
-
-        // Backprop for output layer
-        const outputDeltas = error.map((e, i) => e * output[i] * (1 - output[i]));
-        for (let i = 0; i < nn.hiddenWeights.length; i++) {
-          const outputDelta = outputDeltas[i];
-          if (isFinite(outputDelta)) {
-            for (let j = 0; j < hidden2.length; j++) {
-              const update = learningRate * outputDelta * hidden2[j];
-              if (isFinite(update)) {
-                nn.hiddenWeights[i][j] = (nn.hiddenWeights[i][j] || 0) + update;
-                nn.hiddenWeights[i][j] = Math.max(-10, Math.min(10, nn.hiddenWeights[i][j]));
-              }
-            }
-            const biasUpdate = learningRate * outputDelta;
-            if (isFinite(biasUpdate)) {
-              nn.outputBias[i] = (nn.outputBias[i] || 0) + biasUpdate;
-              nn.outputBias[i] = Math.max(-10, Math.min(10, nn.outputBias[i]));
-            }
-          }
-        }
-
-        // Backprop for second hidden layer
-        const hidden2Deltas = hidden2.map((h, i) => {
-          const errorSum = outputDeltas.reduce((sum, delta, k) => safeAdd(sum, safeMult(delta, nn.hiddenWeights[k][i] || 0)), 0);
-          return errorSum * (h > 0 ? 1 : 0); // ReLU derivative
-        });
-        for (let i = 0; i < nn.weights2.length; i++) {
-          const hiddenDelta = hidden2Deltas[i];
-          if (isFinite(hiddenDelta)) {
-            for (let j = 0; j < hidden1.length; j++) {
-              const update = learningRate * hiddenDelta * hidden1[j];
-              if (isFinite(update)) {
-                nn.weights2[i][j] = (nn.weights2[i][j] || 0) + update;
-                nn.weights2[i][j] = Math.max(-10, Math.min(10, nn.weights2[i][j]));
-              }
-            }
-            const biasUpdate = learningRate * hiddenDelta;
-            if (isFinite(biasUpdate)) {
-              nn.bias2[i] = (nn.bias2[i] || 0) + biasUpdate;
-              nn.bias2[i] = Math.max(-10, Math.min(10, nn.bias2[i]));
-            }
-          }
-        }
-
-        // Backprop for first hidden layer
-        const hidden1Deltas = hidden1.map((h, i) => {
-          const errorSum = hidden2Deltas.reduce((sum, delta, k) => safeAdd(sum, safeMult(delta, nn.weights2[k][i] || 0)), 0);
-          return errorSum * (h > 0 ? 1 : 0);
-        });
-        for (let i = 0; i < nn.weights1.length; i++) {
-          const hiddenDelta = hidden1Deltas[i];
-          if (isFinite(hiddenDelta)) {
-            for (let j = 0; j < features.length; j++) {
-              const update = learningRate * hiddenDelta * features[j];
-              if (isFinite(update)) {
-                nn.weights1[i][j] = (nn.weights1[i][j] || 0) + update;
-                nn.weights1[i][j] = Math.max(-10, Math.min(10, nn.weights1[i][j]));
-              }
-            }
-            const biasUpdate = learningRate * hiddenDelta;
-            if (isFinite(biasUpdate)) {
-              nn.bias1[i] = (nn.bias1[i] || 0) + biasUpdate;
-              nn.bias1[i] = Math.max(-10, Math.min(10, nn.bias1[i]));
-            }
-          }
-        }
-      });
-
-      nn.loss = isFinite(totalLoss) ? totalLoss / Math.max(selectedData.length, 1) : 1.0;
-      nn.accuracy = selectedData.length > 0 ? correct / selectedData.length : 0;
-      nn.epochs++;
-      nn.lastUpdate = currentTime;
-
-      if (nn.accuracy >= mlConfig.neuralNetwork.targetAccuracy || 
+  setMLSystem(prev => {
+    const nn = { ...prev.neuralNetwork };
+    nn.loss = isFinite(lossValue) ? lossValue : nn.loss;
+    nn.accuracy = selected.length > 0 ? correct / selected.length : 0;
+    nn.epochs++;
+    nn.lastUpdate = currentTime;
+    const w = tfModelRef.current.getWeights();
+    nn.weights1 = w[0].arraySync();
+    nn.bias1 = w[1].arraySync();
+    nn.weights2 = w[2].arraySync();
+    nn.bias2 = w[3].arraySync();
+    nn.hiddenWeights = w[4].arraySync();
+    nn.outputBias = w[5].arraySync();
+    if (nn.accuracy >= mlConfig.neuralNetwork.targetAccuracy ||
         nn.epochs >= mlConfig.neuralNetwork.maxEpochs) {
-        setMLConfig(prevConfig => ({
-          ...prevConfig,
-          neuralNetwork: { ...prevConfig.neuralNetwork, isTraining: false }
-        }));
-      }
-
-      return { ...prev, neuralNetwork: nn };
-    });
-  }, [businessEntities, pestleFactors, relu, sigmoid, safeAdd, safeMult, mlConfig, currentTime]);
+      setMLConfig(prevCfg => ({
+        ...prevCfg,
+        neuralNetwork: { ...prevCfg.neuralNetwork, isTraining: false }
+      }));
+    }
+    return { ...prev, neuralNetwork: nn };
+  });
+}, [businessEntities, pestleFactors, mlConfig, currentTime]);
 
   // XOR training remains the same, but with adjusted rate for convergence
 
