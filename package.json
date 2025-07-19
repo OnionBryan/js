@@ -1,0 +1,13 @@
+{
+  "name": "ml-network",
+  "version": "1.0.0",
+  "description": "Neural network with Bayesian loop",
+  "main": "nn_bayes.js",
+  "type": "module",
+  "scripts": {
+    "start": "node nn_bayes.js"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs-node": "^4.14.0"
+  }
+}
