@@ -127,6 +127,9 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
   const prng = useMemo(() => new PseudoRandomNumberGenerator(42), []);
   const weightInitializer = useMemo(() => new WeightInitializer(prng), [prng]);
 
+  // Neural network input dimension (base features + neighbor aggregation)
+  const NN_INPUT_SIZE = 24;
+
   const [isSimulating, setIsSimulating] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [activeModule, setActiveModule] = useState('overview');
@@ -224,7 +227,8 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
           xorPattern: `${(i % 2).toString()}${((i >> 1) % 2).toString()}${((i >> 2) % 2).toString()}${((i >> 3) % 2).toString()}`,
           spatialEncoding: null,
           learningRate: ML_CONSTANTS.LEARNING.ADAPTIVE_LR_DECAY * (0.005 + innovation * 0.015),
-          confidence: Math.tanh(trust * 2 - 1) * 0.5 + 0.5
+          confidence: Math.tanh(trust * 2 - 1) * 0.5 + 0.5,
+          neighborFeatures: new Array(6).fill(0)
         }
       };
     });
@@ -283,7 +287,7 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
 
   const [mlConfig, setMLConfig] = useState({
     neuralNetwork: {
-      inputSize: 18,
+      inputSize: NN_INPUT_SIZE,
       hiddenSize1: 64, // Enriched: added more hidden layers
       hiddenSize2: 32,
       outputSize: 12,
@@ -321,7 +325,7 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
   const [mlSystem, setMLSystem] = useState(() => {
     return {
       neuralNetwork: {
-        weights1: weightInitializer.initializeMatrix(18, 64, 'xavier'),
+        weights1: weightInitializer.initializeMatrix(NN_INPUT_SIZE, 64, 'xavier'),
         weights2: weightInitializer.initializeMatrix(64, 32, 'xavier'),
         hiddenWeights: weightInitializer.initializeMatrix(32, 12, 'xavier'),
         bias1: weightInitializer.initializeBias(64),
@@ -332,7 +336,7 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
         accuracy: 0,
         lastUpdate: 0,
         // Add momentum and adaptive learning rate tracking
-        momentum1: new Array(18).fill(0).map(() => new Array(64).fill(0)),
+        momentum1: new Array(NN_INPUT_SIZE).fill(0).map(() => new Array(64).fill(0)),
         momentum2: new Array(64).fill(0).map(() => new Array(32).fill(0)),
         momentumHidden: new Array(32).fill(0).map(() => new Array(12).fill(0)),
         velocityBias1: new Array(64).fill(0),
@@ -425,6 +429,58 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
     return arr.map(val => val / sum);
   }, []);
 
+  // Generic matrix multiplication utility
+  const multiplyMatrices = useCallback((A, B) => {
+    const rowsA = A.length, colsA = A[0].length, colsB = B[0].length;
+    const result = Array.from({ length: rowsA }, () => new Array(colsB).fill(0));
+    for (let i = 0; i < rowsA; i++) {
+      for (let k = 0; k < colsB; k++) {
+        let sum = 0;
+        for (let j = 0; j < colsA; j++) {
+          sum += (A[i][j] || 0) * (B[j][k] || 0);
+        }
+        result[i][k] = isFinite(sum) ? sum : 0;
+      }
+    }
+    return result;
+  }, []);
+
+  // Build adjacency matrix from entity connections
+  const computeAdjacencyMatrix = useCallback((entities) => {
+    const n = entities.length;
+    const matrix = Array.from({ length: n }, () => new Array(n).fill(0));
+    entities.forEach((e, i) => {
+      e.connections.forEach(connId => {
+        const j = entities.findIndex(en => en.id === connId);
+        if (j >= 0) matrix[i][j] = 1;
+      });
+    });
+    return matrix;
+  }, []);
+
+  // Extract basic feature matrix from entities
+  const computeFeatureMatrix = useCallback((entities) => {
+    return entities.map(e => [
+      e.state.innovation || 0,
+      e.state.trust || 0,
+      e.state.prestige || 0,
+      e.state.wants || 0,
+      e.state.needs || 0,
+      e.state.coherence || 0
+    ]);
+  }, []);
+
+  const aggregateNodeFeatures = useCallback((entities) => {
+    const adj = computeAdjacencyMatrix(entities);
+    const feats = computeFeatureMatrix(entities);
+    const aggregated = multiplyMatrices(adj, feats);
+    aggregated.forEach((vec, i) => {
+      const degree = adj[i].reduce((a, b) => a + b, 0) || 1;
+      const normalized = vec.map(v => v / degree);
+      entities[i].mlState.neighborFeatures = normalized;
+    });
+  }, [computeAdjacencyMatrix, computeFeatureMatrix, multiplyMatrices]);
+
   const toggleNeuralNetworkTraining = useCallback(() => {
     setMLConfig(prev => ({
       ...prev,
@@ -459,7 +515,7 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
     if (!mlConfig.neuralNetwork.isTraining) return;
 
     const extractFeatures = (entity) => {
-      const features = [
+      const baseFeatures = [
         pestleFactors.political || 0, pestleFactors.economic || 0, pestleFactors.social || 0,
         pestleFactors.technological || 0, pestleFactors.legal || 0, pestleFactors.environmental || 0,
         entity.innovation || 0, entity.trust || 0, entity.prestige || 0,
@@ -468,6 +524,8 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
         (entity.position?.x || 0) / 100, (entity.position?.y || 0) / 100, (entity.position?.z || 0) / 100,
         entity.mlState?.confidence || 0.5
       ];
+      const neighbor = entity.mlState?.neighborFeatures || new Array(6).fill(0);
+      const features = baseFeatures.concat(neighbor);
       return features.map(f => isFinite(f) ? f : 0);
     };
 
@@ -1344,10 +1402,11 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
         entity.charge = entity.state.innovation;
         entity.radius = Math.sqrt(entity.marketCap / 1e10) + 2;
       });
+      aggregateNodeFeatures(updatedEntities);
       return updatedEntities;
     });
-  }, [pestleFactors, calculateMatrixForce, calculateMaxwellForce, calculateSpringForce, 
-  calculateOrbitalForce, calculateFluidDrag, calculateVortexForce, 
+  }, [pestleFactors, calculateMatrixForce, calculateMaxwellForce, calculateSpringForce,
+  calculateOrbitalForce, calculateFluidDrag, calculateVortexForce,
   calculateCenterAttraction, evolveEntityState, capForce]);
 
   const updateSimulation = useCallback(() => {
