@@ -116,11 +116,52 @@ class WeightInitializer {
 
   // Initialize bias vector
   initializeBias(size) {
-    return new Array(size).fill(0).map(() => 
+    return new Array(size).fill(0).map(() =>
       this.prng.nextGaussian(0, ML_CONSTANTS.INITIALIZATION.BIAS_INIT_SCALE)
     );
   }
 }
+
+// Matrix utilities for network analysis
+const multiplyMatrixVector = (matrix, vector) => {
+  const result = new Array(matrix.length).fill(0);
+  for (let i = 0; i < matrix.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < vector.length; j++) {
+      sum += matrix[i][j] * vector[j];
+    }
+    result[i] = sum;
+  }
+  return result;
+};
+
+const computeEigenvectorCentrality = (adjMatrix, maxIter = 100, epsilon = 1e-6) => {
+  const n = adjMatrix.length;
+  if (n === 0) return [];
+  let vec = new Array(n).fill(1 / Math.sqrt(n));
+  for (let iter = 0; iter < maxIter; iter++) {
+    const newVec = multiplyMatrixVector(adjMatrix, vec);
+    const norm = Math.sqrt(newVec.reduce((acc, val) => acc + val * val, 0));
+    if (norm === 0) break;
+    for (let i = 0; i < n; i++) newVec[i] /= norm;
+    const diff = Math.sqrt(newVec.reduce((acc, val, i) => acc + (val - vec[i]) ** 2, 0));
+    vec = newVec;
+    if (diff < epsilon) break;
+  }
+  return vec;
+};
+
+const computeAdjacencyMatrix = (entities) => {
+  const n = entities.length;
+  const matrix = Array.from({ length: n }, () => new Array(n).fill(0));
+  entities.forEach((entity, i) => {
+    entity.connections.forEach(id => {
+      const j = entities.findIndex(e => e.id === id);
+      if (j >= 0) matrix[i][j] = 1;
+    });
+  });
+  return matrix;
+};
 
 const UnifiedPESTLEMaxwellMLSystem = () => {
   // Initialize PRNG with deterministic seed for reproducible results
@@ -224,7 +265,8 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
           xorPattern: `${(i % 2).toString()}${((i >> 1) % 2).toString()}${((i >> 2) % 2).toString()}${((i >> 3) % 2).toString()}`,
           spatialEncoding: null,
           learningRate: ML_CONSTANTS.LEARNING.ADAPTIVE_LR_DECAY * (0.005 + innovation * 0.015),
-          confidence: Math.tanh(trust * 2 - 1) * 0.5 + 0.5
+          confidence: Math.tanh(trust * 2 - 1) * 0.5 + 0.5,
+          centrality: 0
         }
       };
     });
@@ -465,7 +507,7 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
         entity.innovation || 0, entity.trust || 0, entity.prestige || 0,
         entity.state?.wants || 0, entity.state?.needs || 0, entity.state?.coherence || 0,
         Math.log(Math.max(entity.marketCap, 1e6) / 1e9) / 10, entity.influence || 0,
-        (entity.position?.x || 0) / 100, (entity.position?.y || 0) / 100, (entity.position?.z || 0) / 100,
+        (entity.position?.x || 0) / 100, (entity.position?.y || 0) / 100, entity.mlState?.centrality || 0,
         entity.mlState?.confidence || 0.5
       ];
       return features.map(f => isFinite(f) ? f : 0);
@@ -891,7 +933,7 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
         [matrix6D.trust, matrix6D.coherence, matrix6D.wants, entity.state.trust, entity.state.wants, entity.activity],
         [matrix6D.prestige, matrix6D.wants, matrix6D.needs, entity.state.prestige, entity.state.needs, entity.radius],
         [entity.innovation, entity.state.trust, entity.state.prestige, entity.mlState.neuralActivation, entity.mlState.bayesianBelief, entity.mlState.confidence],
-        [entity.trust, entity.state.wants, entity.state.needs, entity.mlState.quantumEntanglement, entity.spatialEfficiency, entity.learningTokens / 1000],
+        [entity.trust, entity.state.wants, entity.state.needs, entity.mlState.quantumEntanglement, entity.spatialEfficiency, entity.mlState.centrality],
         [entity.influence, entity.activity, entity.radius, entity.mass, Math.log(entity.marketCap / 1e9) / 10, entity.charge]
       ];
     });
@@ -1344,10 +1386,15 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
         entity.charge = entity.state.innovation;
         entity.radius = Math.sqrt(entity.marketCap / 1e10) + 2;
       });
+      const adj = computeAdjacencyMatrix(updatedEntities);
+      const centrality = computeEigenvectorCentrality(adj);
+      updatedEntities.forEach((e, idx) => {
+        if (e.mlState) e.mlState.centrality = centrality[idx] || 0;
+      });
       return updatedEntities;
     });
-  }, [pestleFactors, calculateMatrixForce, calculateMaxwellForce, calculateSpringForce, 
-  calculateOrbitalForce, calculateFluidDrag, calculateVortexForce, 
+  }, [pestleFactors, calculateMatrixForce, calculateMaxwellForce, calculateSpringForce,
+  calculateOrbitalForce, calculateFluidDrag, calculateVortexForce,
   calculateCenterAttraction, evolveEntityState, capForce]);
 
   const updateSimulation = useCallback(() => {
@@ -1431,6 +1478,7 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
       color: getEntityColor(entity.type),
       influence: entity.influence,
       velocity: Math.sqrt(entity.velocity.x**2 + entity.velocity.y**2 + entity.velocity.z**2),
+      centrality: entity.mlState.centrality,
       state: entity.state,
       mlState: entity.mlState
     }));
@@ -2184,6 +2232,7 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
                       <div>Velocity: {data.velocity.toFixed(3)}</div>
                       <div>ML Activation: {data.mlState?.neuralActivation?.toFixed(3) || 'N/A'}</div>
                       <div>Quantum Entanglement: {data.mlState?.quantumEntanglement?.toFixed(3) || 'N/A'}</div>
+                      <div>Centrality: {data.mlState?.centrality?.toFixed(3) || '0.000'}</div>
                     </div>
                   );
                 }
@@ -2226,6 +2275,7 @@ const UnifiedPESTLEMaxwellMLSystem = () => {
                     <div>Bayesian: {entity.mlState.bayesianBelief.toFixed(2)}</div>
                     <div>Quantum: {entity.mlState.quantumEntanglement.toFixed(2)}</div>
                     <div>Confidence: {entity.mlState.confidence.toFixed(2)}</div>
+                    <div>Centrality: {entity.mlState.centrality.toFixed(2)}</div>
                   </div>
                 </div>
               </div>
